@@ -77,6 +77,8 @@ PALIERS = [0, 2, 5, 7.5, 10, 15, 20, 30, math.inf]
 COUL_PALIERS = [couleur_lux(m) for m in (1, 3.5, 6.25, 8.75, 12.5, 17.5, 25, 40)]
 COUL_TYPES = {"sodium": "#ff8a2a", "blanc_2700": "#ffd23f", "led_3000": "#3b9bff", "blanc_neutre": "#2ad4b0",
               "blanc_froid": "#b18cff", "inconnu": "#a0a8b5"}          # couleurs de carte.html
+# valeurs aberrantes retirées par le filtrage du bruit, couleur par motif
+COUL_MOTIFS = {"trop haut": "#ff3b3b", "trop bref": "#ff9f43", "variation à l'arrêt": "#c77dff"}
 
 TO93 = Transformer.from_crs(4326, 2154, always_xy=True)
 TO84 = Transformer.from_crs(2154, 4326, always_xy=True)
@@ -172,7 +174,7 @@ def charger(dossier, brut=False):
 @lru_cache(maxsize=4)
 def _charger(dossier, _mtime):
     d = Path(dossier)
-    sortie = {"resume": {}, "hex": None, "mesures": None, "supports": None, "luminaires": None,
+    sortie = {"resume": {}, "hex": None, "mesures": None, "supports": None, "luminaires": None, "aberrants": None,
               "troncons": None, "geoms": None, "erreur_troncons": None, "arbre_pts": None, "brut": False,
               "nom": d.name, "version": int(_mtime)}
     if (d / "resume.json").exists():
@@ -215,6 +217,7 @@ def _charger(dossier, _mtime):
                              "lat": f["geometry"]["coordinates"][1]}
                             for f in gj["features"] if f.get("geometry")])
         sortie["luminaires"] = lum if not lum.empty else None
+    sortie["aberrants"] = aberrants_gps(sortie["resume"], sortie["mesures"])
     return sortie
 
 
@@ -233,6 +236,51 @@ def _charger_brut(dossier, mtime):
         sortie["troncons"]["classe"] = tr["id"].map(cl).fillna(tr["classe"])
     sortie["hex"] = H.calculer(m)
     return sortie
+
+
+def _heure_dec(h):
+    """'23h31:30' -> 23.525 (heure locale décimale)."""
+    try:
+        hh, reste = str(h).split("h")
+        mm, ss = (reste.split(":") + ["0"])[:2]
+        return int(hh) + int(mm) / 60 + float(ss) / 3600
+    except ValueError:
+        return None
+
+
+def aberrants_gps(resume, m):
+    """Valeurs aberrantes retirées par le filtrage (resume.json -> qualite.aberrants), avec leur point GPS.
+    Si l'analyse fournit déjà lat / lon (8 champs), on les prend. Sinon on retrouve le point dans
+    mesures_pas2m.csv : parmi les mesures de la même seconde, celle dont le maximum brut (avant filtrage,
+    colonne Emax_brut) est le plus fort, c'est-à-dire là où le pic a été vu. Si le véhicule était arrêté
+    (pas de mesure à cette seconde), on prend la mesure la plus proche dans le temps (position approchée)."""
+    ab = (resume.get("qualite") or {}).get("aberrants") or []
+    if not ab:
+        return None
+    lignes = []
+    h_m = m["heure_locale"].to_numpy(float) if m is not None and "heure_locale" in m else None
+    emax = m["Emax_brut"].to_numpy(float) if m is not None and "Emax_brut" in m else None
+    for k, a in enumerate(ab):
+        heure, pic, duree, largeur, fond, motif = (list(a) + [None] * 6)[:6]
+        lat = lon = None
+        precision = "exacte (GPS de l'analyse)"
+        if len(a) >= 8 and a[6] is not None:
+            lat, lon = float(a[6]), float(a[7])
+        elif h_m is not None and _heure_dec(heure) is not None:
+            h = _heure_dec(heure)
+            dt = np.abs(((h_m - h + 12) % 24) - 12) * 3600            # écart en secondes (passage de minuit géré)
+            fen = np.where((dt <= 1.5))[0]
+            if len(fen):
+                i = fen[np.argmax(emax[fen])] if emax is not None else fen[np.argmin(dt[fen])]
+                precision = "à ± 5 m"
+            else:
+                i = int(np.argmin(dt))
+                precision = "approchée (véhicule à l'arrêt)"
+            lat, lon = float(m["lat"].iat[i]), float(m["lon"].iat[i])
+        lignes.append(dict(id=k, heure=heure, motif=motif, pic_lx=pic, fond_lx=fond, largeur_m=largeur, duree_s=duree,
+                           lat=lat, lon=lon, precision=precision))
+    df = pd.DataFrame(lignes)
+    return df if df["lat"].notna().any() else None
 
 
 def lien_streetview(lat, lon, cap=0):
@@ -389,7 +437,7 @@ def carte(data, mode, couleur, couches, sdal, selection, fond, vue, uirev):
     m = data["mesures"]
     vue = vue or {}
     zoom = vue.get("zoom") or ZOOM0
-    meta = {"lum": [], "sus": [], "points": [], "i_tr": None, "i_pt": None}
+    meta = {"lum": [], "sus": [], "ab": [], "points": [], "i_tr": None, "i_pt": None}
     if m is None:
         return carte_vide("Aucune mesure dans ce rapport"), meta
     fig = go.Figure()
@@ -440,6 +488,20 @@ def carte(data, mode, couleur, couches, sdal, selection, fond, vue, uirev):
                 customdata=lum.reindex(columns=["E_pic", "n_detections"]).values,
                 hovertemplate="💡 Luminaire détecté<br>Pic : %{customdata[0]:.0f} lx"
                               "<br>Détections : %{customdata[1]}<extra></extra>"))
+
+    ab = data["aberrants"]                                    # valeurs aberrantes retirées, par motif
+    if ab is not None:
+        for motif, g in ab.dropna(subset=["lat"]).groupby("motif"):
+            meta["ab"].append(len(fig.data))
+            fig.add_trace(go.Scattermap(
+                lat=g["lat"], lon=g["lon"], mode="markers", name=f"⚠ Aberrant · {motif} ({len(g)})",
+                visible="ab" in couches,
+                marker=dict(size=13, color=COUL_MOTIFS.get(motif, ROUGE), opacity=0.95),
+                customdata=g.reindex(columns=["motif", "pic_lx", "fond_lx", "largeur_m", "duree_s", "heure"])
+                .assign(_a="", _b="", _marque="aberrant").values,     # 9 champs : distinct des tronçons (7)
+                hovertemplate="<b>Valeur aberrante retirée</b> — %{customdata[0]}<br>Pic %{customdata[1]:.0f} lx "
+                              "(fond %{customdata[2]:.0f} lx) · largeur %{customdata[3]:.1f} m<br>%{customdata[5]}"
+                              "<br><i>clic : voir dans Street View</i><extra></extra>"))
 
     s = data["supports"]
     if s is not None and "suspect" in s and s["suspect"].any():
@@ -559,6 +621,51 @@ def types_lampes(data):
                       title=dict(text=f"{fmt(k.get('n_lampadaires'), dec=0)} lampadaires estimés · "
                                       f"{fmt(k.get('puissance_tot_kw'), ' kW')} installés", font_size=13, x=0.01))
     return fig
+
+
+def bruit(data):
+    """Onglet « Bruit et valeurs aberrantes » : ce que le filtrage a corrigé et la liste des pics retirés,
+    chacun avec ses coordonnées GPS. Clic sur une ligne -> Street View à droite et carte centrée sur le point."""
+    q, k = data["resume"].get("qualite", {}), data["resume"].get("kpi", {})
+    ab = data["aberrants"]
+    cols = [("heure", "Heure"), ("motif", "Motif"), ("pic_lx", "Pic (lx)"), ("fond_lx", "Fond (lx)"),
+            ("largeur_m", "Largeur (m)"), ("gps", "Coordonnées GPS"), ("precision", "Position")]
+    # table toujours présente (vide et masquée s'il n'y a rien) : elle est une entrée de choisir_point
+    table_vide = html.Div(dash_table.DataTable(id="table-aberrants", data=[],
+                                               columns=[{"name": n, "id": c} for c, n in cols]), hidden=True)
+    if not q:
+        return html.Div([html.P("Pas d'informations sur le bruit dans ce rapport.", className="text-muted"),
+                         table_vide])
+    par_motif = ab["motif"].value_counts().to_dict() if ab is not None else {}
+    pastille = lambda c: html.Span(style={"display": "inline-block", "width": "10px", "height": "10px",  # noqa: E731
+                                          "borderRadius": "50%", "background": c, "marginRight": "6px"})
+    intro = html.Div([
+        html.P([html.B(f"{fmt(k.get('n_aberrants'), dec=0)} valeurs aberrantes retirées"),
+                f" ({fmt(q.get('part_aberrants'), ' %', 2)} des mesures), remplacées par interpolation. "
+                f"Autres corrections : {fmt(q.get('part_negatifs'), ' %', 1)} de mesures négatives ramenées à 0, "
+                f"{fmt(q.get('part_pics'), ' %', 2)} de parasites sur un seul capteur (filtre de Hampel), "
+                f"{fmt(k.get('n_pas_incoh'), dec=0)} passages incohérents écartés (phares, vitrine)."],
+               className="small mb-2"),
+        html.Div([html.Span([pastille(COUL_MOTIFS.get(m_, ROUGE)), f"{n} {m_}"], className="me-3 small")
+                  for m_, n in par_motif.items()], className="mb-2"),
+        html.P([html.I(className="bi bi-cursor me-1"),
+                "Cliquez une ligne : Street View s'ouvre à droite sur le lieu du pic et la carte s'y centre. "
+                "Activez « Valeurs aberrantes » au-dessus de la carte pour les voir toutes."],
+               className="small text-muted mb-2"),
+    ])
+    if ab is None:
+        return html.Div([intro, table_vide])
+    t = ab.assign(gps=[f"{a:.5f}, {b:.5f}" if pd.notna(a) else "–" for a, b in zip(ab["lat"], ab["lon"])])
+    t = t.astype(object).where(t.notna(), None)
+    return html.Div([intro, dash_table.DataTable(
+        id="table-aberrants", data=t[[c for c, _ in cols] + ["id"]].to_dict("records"),
+        columns=[{"name": n, "id": c} for c, n in cols], sort_action="native", page_size=10, **STYLE_TABLE,
+        style_data_conditional=[
+            *[{"if": {"filter_query": f'{{motif}} = "{m_}"', "column_id": "motif"}, "color": c}
+              for m_, c in COUL_MOTIFS.items()],
+            {"if": {"column_id": "gps"}, "color": "#38d9f5", "fontFamily": "monospace"},
+            {"if": {"state": "active"}, "backgroundColor": "rgba(56,217,245,0.15)", "border": "1px solid #38d9f5"}],
+    )])
 
 
 def chronologie(data):
@@ -755,7 +862,8 @@ app.layout = html.Div(className="page", children=[
                          "value": "satellite"}], "Fond"),
                     dbc.Checklist(id="couches", value=[], switch=True, className="small outil-couches",
                                   options=[{"label": "Lampadaires estimés", "value": "lum"},
-                                           {"label": "Supports suspects", "value": "sus"}]),
+                                           {"label": "Supports suspects", "value": "sus"},
+                                           {"label": "Valeurs aberrantes", "value": "ab"}]),
                 ])),
                 html.Div(id="bandeau-lissage"),
                 dbc.CardBody(dcc.Graph(id="carte", config={"scrollZoom": True, "displaylogo": False}),
@@ -794,6 +902,7 @@ app.layout = html.Div(className="page", children=[
                     dbc.Tab(label="Lampadaires", tab_id="lampes"),
                     dbc.Tab(label="Chronologie", tab_id="chrono"),
                     dbc.Tab(label="Qualité des données", tab_id="qualite"),
+                    dbc.Tab(label="Bruit et valeurs aberrantes", tab_id="bruit"),
                 ])),
                 dbc.CardBody([
                     html.Div(id="tableau"),
@@ -801,6 +910,7 @@ app.layout = html.Div(className="page", children=[
                     html.Div(dcc.Graph(id="lampes", config={"displayModeBar": False}), id="p-lampes"),
                     html.Div(dcc.Graph(id="chrono", config={"displayModeBar": False}), id="p-chrono"),
                     html.Div(id="qualite"),
+                    html.Div(id="bruit"),
                 ]),
             ])),
         ]),
@@ -923,7 +1033,7 @@ app.clientside_callback(
 
 
 ONGLETS = {"troncons": "tableau", "distrib": "p-distrib", "lampes": "p-lampes", "chrono": "p-chrono",
-           "qualite": "qualite"}
+           "qualite": "qualite", "bruit": "bruit"}
 
 
 @app.callback(*[Output(p, "style") for p in ONGLETS.values()], Input("onglets", "active_tab"))
@@ -934,12 +1044,12 @@ def changer_onglet(onglet):
 # ------------------------------------------------------------------ CALLBACKS : AFFICHAGE
 @app.callback(Output("contexte", "children"), Output("kpis", "children"), Output("deficits", "children"),
               Output("distrib", "figure"), Output("lampes", "figure"), Output("chrono", "figure"),
-              Output("tableau", "children"), Output("qualite", "children"),
+              Output("tableau", "children"), Output("qualite", "children"), Output("bruit", "children"),
               Input("choix-rapport", "value"), *SDAL_INPUTS)
 def afficher(dossier, *valeurs):
     if not dossier:
         vide = carte_vide("Aucune tournée analysée — cliquez sur « Nouvelle tournée »", 360)
-        return None, [], None, vide, vide, vide, None, None
+        return None, [], None, vide, vide, vide, None, None, None
     sdal = sdal_de(valeurs)
     data = charger(dossier)
     meta = data["resume"].get("meta", {})
@@ -989,7 +1099,7 @@ def afficher(dossier, *valeurs):
                         "tronçons à double sens mesurés dans un seul sens", "warning" if n_comp else "success"))
 
     return ([contexte, alerte], kpis, deficits_par_rue(tr), distribution(tr), types_lampes(data),
-            chronologie(data), tableau_troncons(tr), qualite(data, tr))
+            chronologie(data), tableau_troncons(tr), qualite(data, tr), bruit(data))
 
 
 # ------------------------------------------------------------------ CALLBACKS : CARTE
@@ -1057,7 +1167,7 @@ def changer_couches(couches, meta):
     if not meta:
         return dash.no_update
     p = Patch()
-    for cle in ("lum", "sus"):
+    for cle in ("lum", "sus", "ab"):
         for i in meta.get(cle, []):
             p["data"][i]["visible"] = cle in (couches or [])
     return p
@@ -1123,8 +1233,9 @@ def _selection_rue(data, nom):
 @app.callback(Output("selection", "data"),
               Input("carte", "clickData"), Input({"type": "deficit", "index": ALL}, "n_clicks"),
               Input("table-troncons", "active_cell"), Input("table-qualite", "active_cell"),
+              Input("table-aberrants", "active_cell"),
               State("choix-rapport", "value"), prevent_initial_call=True)
-def choisir_point(clic_carte, clics_deficit, cellule, cellule_q, dossier):
+def choisir_point(clic_carte, clics_deficit, cellule, cellule_q, cellule_ab, dossier):
     if not dossier:
         return dash.no_update
     data = charger(dossier)
@@ -1148,6 +1259,9 @@ def choisir_point(clic_carte, clics_deficit, cellule, cellule_q, dossier):
         elif isinstance(cd, list) and len(cd) == 8 and cd[7] == "lampe":          # lampadaire estimé
             sel.update(titre=f"💡 Lampadaire estimé — {cd[0]}",
                        detail=f"{cd[1]:.0f} W estimés · côté {cd[4]} · pic {cd[5]:.0f} lx")
+        elif isinstance(cd, list) and len(cd) == 9 and cd[8] == "aberrant":       # valeur aberrante retirée
+            sel.update(titre=f"⚠ Valeur aberrante retirée — {cd[0]}",
+                       detail=f"pic {cd[1]:.0f} lx (fond {cd[2]:.0f} lx) · largeur {cd[3]:.1f} m · {cd[5]}")
         elif isinstance(cd, list) and len(cd) == 3:                                # point chaud / froid
             sel.update(titre="Point de mesure", detail=f"{float(cd[0]):.1f} lx · sens {cd[1]} · {cd[2]}")
         elif hexa is not None:                                                     # hexagone
@@ -1155,6 +1269,19 @@ def choisir_point(clic_carte, clics_deficit, cellule, cellule_q, dossier):
                        f"{fmt(hexa['E_sens1'], ' lx')}, sens 2 : {fmt(hexa['E_sens2'], ' lx')}) · "
                        f"{int(hexa['n_passages'])} passage(s)")
         return sel
+    if src == "table-aberrants":                                    # ligne de l'onglet « Bruit et valeurs aberrantes »
+        ab = data["aberrants"]
+        if not cellule_ab or ab is None or cellule_ab.get("row_id") not in set(ab["id"]):
+            return dash.no_update
+        a = ab.set_index("id").loc[cellule_ab["row_id"]]
+        if pd.isna(a["lat"]):
+            return dash.no_update
+        lat, lon = float(a["lat"]), float(a["lon"])
+        return {"lat": lat, "lon": lon, "cap": cap_proche(data, lat, lon), "centrer": True,
+                "tid": f"ab:{cellule_ab['row_id']}",
+                "titre": f"⚠ Valeur aberrante retirée — {a['motif']}",
+                "detail": f"pic {a['pic_lx']:.0f} lx (fond {a['fond_lx']:.0f} lx) · largeur {a['largeur_m']:.1f} m · "
+                          f"{a['heure']} · position {a['precision']}"}
     tid, extra = None, None
     if isinstance(src, dict) and src.get("type") == "deficit":
         if not ctx.triggered or not ctx.triggered[0]["value"]:      # liste redessinée, pas un clic
