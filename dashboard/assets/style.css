@@ -155,3 +155,23 @@ body {
 .badge-type { font-size: 0.68rem; padding: 1px 7px; border-radius: 999px; background: var(--bord); color: var(--texte-2); }
 .badge-alerte { font-size: 0.68rem; padding: 1px 7px; border-radius: 999px; background: rgba(255, 159, 67, 0.15);
   color: #ffb877; border: 1px solid rgba(255, 159, 67, 0.4); }
+
+/* --- carte Leaflet */
+.carte-leaflet { position: relative; }
+.carte-leaflet .leaflet-container { background: #0b0e13; font-family: Inter, system-ui, sans-serif; }
+.carte-leaflet .fond-clair.leaflet-container { background: #f2f3f5; }
+.legende-carte { position: absolute; top: 10px; left: 54px; z-index: 500; pointer-events: none;
+  background: rgba(13, 17, 23, 0.82); border: 1px solid var(--bord); border-radius: 8px; padding: 7px 10px;
+  font-size: 0.74rem; color: var(--texte); display: flex; flex-direction: column; gap: 4px; min-width: 120px; }
+.legende-carte:empty { display: none; }
+.legende-carte .pastille { display: inline-block; width: 18px; height: 4px; border-radius: 2px; margin-right: 6px;
+  vertical-align: middle; }
+.legende-carte .pastille.rond { width: 9px; height: 9px; border-radius: 50%; border: 1px solid #111; }
+.legende-carte .leg-titre { font-weight: 600; color: var(--texte-2); }
+.legende-carte .rampe { width: 150px; height: 9px; border-radius: 3px; }
+.legende-carte .rampe-graduations { display: flex; justify-content: space-between; width: 150px; color: var(--texte-2); }
+.leaflet-tooltip { background: #161b22; color: #e6edf3; border: 1px solid #30363d; font-size: 12px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .4); }
+.leaflet-tooltip-top:before, .leaflet-tooltip-bottom:before, .leaflet-tooltip-left:before,
+.leaflet-tooltip-right:before { display: none; }
+.leaflet-control-attribution { font-size: 10px; }
