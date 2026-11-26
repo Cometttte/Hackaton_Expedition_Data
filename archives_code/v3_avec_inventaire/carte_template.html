@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Carte satellite du relevé</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{ --panel:#ffffffee; --ink:#172031; --ink-2:#586377; --rule:#d5dbe4; --accent:#1a5bb0; --crit:#d63c3c; --warn:#e5a50a;
+  --f-body:"IBM Plex Sans",system-ui,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace; }
+html,body{height:100%;margin:0;font:14px/1.45 var(--f-body);color:var(--ink);background:#0d1117}
+#map{position:absolute;inset:0}
+.panel{position:absolute;z-index:1000;top:12px;left:12px;width:290px;max-height:calc(100% - 24px);overflow:auto;background:var(--panel);
+  border:1px solid var(--rule);border-radius:8px;padding:12px 14px;box-shadow:0 6px 24px rgba(0,0,0,.25);backdrop-filter:blur(4px)}
+.panel h1{font-size:16px;margin:0 0 2px;font-weight:600}
+.panel .sub{font-size:12px;color:var(--ink-2);margin-bottom:10px}
+.panel h2{font:500 11px var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-2);margin:12px 0 6px;border-top:1px solid var(--rule);padding-top:10px}
+.panel label{display:flex;gap:8px;align-items:center;padding:3px 0;cursor:pointer}
+.panel input{accent-color:var(--accent);margin:0}
+.row{display:flex;gap:14px;flex-wrap:wrap}
+.ramp{height:10px;border-radius:3px;margin:6px 0 2px}
+.ticks{display:flex;justify-content:space-between;font:11px var(--f-mono);color:var(--ink-2)}
+.note{font-size:11.5px;color:var(--ink-2);margin-top:8px}
+.sw{display:inline-block;width:10px;height:10px;border-radius:50%}
+.tip{position:absolute;z-index:1001;pointer-events:none;background:#fff;color:var(--ink);border:1px solid var(--rule);border-radius:6px;padding:7px 9px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.2);white-space:nowrap}
+.tip b{font-family:var(--f-mono);font-weight:500}
+#toggle{display:none}
+.rb{font:500 14px var(--f-body);width:32px;height:28px;border:1px solid var(--rule);border-radius:4px;background:#fff;color:var(--ink);cursor:pointer}
+.rb:hover{border-color:var(--accent);color:var(--accent)}
+code{font-family:var(--f-mono);font-size:11px}
+@media (max-width:600px){ .panel{width:calc(100% - 48px);max-height:45%} }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="panel" id="panel">
+  <h1 id="titre">Carte du relevé</h1>
+  <div class="sub" id="sous-titre"></div>
+
+  <h2>Points chauds / froids</h2>
+  <label><input type="checkbox" id="c-heat" checked> Dégradé lissé (moyenne des 3 capteurs)</label>
+
+  <h2>Capteurs filtrés</h2>
+  <div>
+    <label><input type="checkbox" id="c-s0"> <span id="lab-s0">Gauche</span></label>
+    <label><input type="checkbox" id="c-s1"> <span id="lab-s1">Centre</span></label>
+    <label><input type="checkbox" id="c-s2"> <span id="lab-s2">Droite</span></label>
+  </div>
+  <label><input type="checkbox" id="c-moy"> Médiane des 3 capteurs</label>
+  <div class="row" style="margin-top:4px">
+    <label><input type="checkbox" id="c-sens1" checked> Sens 1</label>
+    <label><input type="checkbox" id="c-sens2" checked> Sens 2</label>
+  </div>
+  <div class="note">Les 3 capteurs sont décalés de 2 m de part et d'autre de la trace pour être lisibles (écart réel : 0,49 m). Sens 1 / sens 2 : les deux sens de circulation de chaque rue.</div>
+
+  <h2>Hexagones</h2>
+  <label><input type="checkbox" id="c-hex"> Éclairement moyen par hexagone</label>
+  <label><input type="checkbox" id="c-conf"> Conformité au seuil</label>
+
+  <h2>Ouvrages</h2>
+  <label><input type="checkbox" id="c-sup"> Supports d'éclairage public</label>
+  <label><input type="checkbox" id="c-off" checked> Supports suspects éteints</label>
+  <label><input type="checkbox" id="c-det"> Sources non inventoriées</label>
+  <label><input type="checkbox" id="c-pos" checked> Positions de l'inventaire à corriger</label>
+  <div class="note">Les supports sont placés sur le point lumineux mesuré. Pour ceux dont l'Excel est faux de plus de <span id="seuil-pos"></span> m, un trait relie la position de l'Excel (rond gris) à la position mesurée (rond violet).</div>
+
+  <h2>Calage sur l'image satellite</h2>
+  <div class="note" style="margin-top:0">Si la trace ne tombe pas exactement sur la route, déplace toutes les couches par pas de 0,5 m (le réglage est mémorisé).</div>
+  <div class="row" style="align-items:center;margin-top:6px;gap:6px">
+    <button class="rb" id="r-o" title="Ouest">←</button><button class="rb" id="r-n" title="Nord">↑</button><button class="rb" id="r-s" title="Sud">↓</button><button class="rb" id="r-e" title="Est">→</button>
+    <button class="rb" id="r-0" title="Revenir au calage d'origine">0</button>
+  </div>
+  <div class="note" id="recal-val"></div>
+  <div class="note">Pour l'appliquer aux prochains rapports : <code id="recal-cli"></code></div>
+  <div class="note" id="calage-note"></div>
+
+  <h2>Échelle de couleur</h2>
+  <div class="ramp" id="ramp"></div>
+  <div class="ticks"><span>0</span><span>10</span><span>20</span><span>30</span><span>40</span><span>≥ 50 lx</span></div>
+  <div class="note" id="note-conf" hidden>Conformité : vert si E moy. ≥ seuil, rouge sinon.</div>
+  <div class="note">Fond : imagerie satellite Esri (ou plan OpenStreetMap, bouton en haut à droite). Molette pour zoomer, survol pour les valeurs.</div>
+</div>
+<div class="tip" id="tip" hidden></div>
+
+<script>
+const C = /*__DATA__*/null;
+const META = /*__META__*/null;
+document.title = `Carte ${META.ville} ${META.date}`;
+if (META.calage && META.calage.decalage_m != null) document.getElementById('calage-note').textContent =
+  `Déjà corrigé automatiquement : latence d'horodatage ${META.calage.latence_s} s et décalage antenne / capteurs ${META.calage.decalage_m} m (remorque, capteurs à ${META.hcap} m du sol).`;
+document.getElementById('titre').textContent = `${META.ville}, ${META.date}`;
+document.getElementById('sous-titre').textContent = `Relevé de ${META.debut} à ${META.fin}, données filtrées (un point tous les 2 m).`;
+C.capteurs.forEach((l,i) => document.getElementById('lab-s'+i).textContent = l.charAt(0).toUpperCase()+l.slice(1));
+
+/* palette froid -> chaud, proche de l'exemple fourni */
+const STOPS = [[0,[15,59,76]],[5,[30,95,105]],[10,[52,135,120]],[15,[140,200,160]],[22,[232,236,160]],[30,[247,214,120]],[40,[246,170,95]],[50,[238,120,70]]];
+function rgb(v){ v = Math.max(0, Math.min(50, v ?? 0)); for (let i=1;i<STOPS.length;i++){ if (v <= STOPS[i][0]){ const [a,ca]=STOPS[i-1], [b,cb]=STOPS[i], t=(v-a)/(b-a);
+  return ca.map((c,k)=>Math.round(c+(cb[k]-c)*t)); } } return STOPS[STOPS.length-1][1]; }
+const col = (v,a=1) => { const c = rgb(v); return `rgba(${c[0]},${c[1]},${c[2]},${a})`; };
+document.getElementById('ramp').style.background = `linear-gradient(90deg,${STOPS.map(s=>col(s[0])+' '+(s[0]*2)+'%').join(',')})`;
+const fmt = (v,d=1) => v==null ? '–' : Number(v).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const hfmt = h => { const hh=Math.floor(h), mm=Math.floor((h-hh)*60), ss=Math.round(((h-hh)*60-mm)*60); return `${hh}h${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`; };
+const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const CARD = ['N','NE','E','SE','S','SO','O','NO'];
+
+/* ---------- carte et fonds ---------- */
+/* recalage sur l'image satellite : décalage d'affichage en mètres (est, nord), mémorisé dans le navigateur */
+const OFF = {e: META.recal?.[0] || 0, n: META.recal?.[1] || 0};
+try { const sv = JSON.parse(localStorage.getItem('getys-recalage-'+META.ville) || 'null'); if (sv) Object.assign(OFF, sv); } catch(e) {}
+const sh = (lat, lon) => [lat + OFF.n/111320, lon + OFF.e/(111320*Math.cos(lat*Math.PI/180))];
+const lats = C.P.map(p=>p[1]), lons = C.P.map(p=>p[0]);
+const map = L.map('map', {preferCanvas:true, zoomControl:true}).fitBounds([[Math.min(...lats),Math.min(...lons)],[Math.max(...lats),Math.max(...lons)]]);
+const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom:21, maxNativeZoom:19, attribution:'Imagerie © Esri, Maxar, Earthstar Geographics'}).addTo(map);
+const lbl = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {maxZoom:21, maxNativeZoom:19});
+const osm = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:21, maxNativeZoom:19, attribution:'© OpenStreetMap'});
+L.control.layers({'Satellite':sat, 'Plan (OpenStreetMap)':osm}, {'Noms de lieux':lbl}, {position:'topright'}).addTo(map);
+L.control.scale({imperial:false, position:'bottomright'}).addTo(map);
+
+/* ---------- calque canvas pour les points (rapide pour ~100 000 points) ---------- */
+const CanvasLayer = L.Layer.extend({
+  initialize(draw){ this._drawFn = draw; },
+  onAdd(m){ this._map = m; this._c = L.DomUtil.create('canvas', 'leaflet-zoom-hide'); this._c.style.position='absolute';
+    m.getPanes().overlayPane.appendChild(this._c); m.on('moveend zoomend resize', this._reset, this); this._reset(); },
+  onRemove(m){ this._c.remove(); m.off('moveend zoomend resize', this._reset, this); },
+  _reset(){ const m = this._map, s = m.getSize(), dpr = devicePixelRatio||1; const tl = m.containerPointToLayerPoint([0,0]);
+    L.DomUtil.setPosition(this._c, tl); this._c.width = s.x*dpr; this._c.height = s.y*dpr; this._c.style.width = s.x+'px'; this._c.style.height = s.y+'px';
+    const ctx = this._c.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); this._drawFn(ctx, m, s); }
+});
+const mpp = () => 40075016.686 * Math.cos(map.getCenter().lat*Math.PI/180) / Math.pow(2, map.getZoom()+8);
+
+const show = {heat:true, s0:false, s1:false, s2:false, moy:false, sens1:true, sens2:true, hex:false, conf:false, sup:false, off:true, det:false, pos:true};
+let PICK = [];   // points dessinés, pour l'info-bulle
+
+/* points chauds / froids : on moyenne les mesures dans une grille à l'écran (valeur moyenne, pas densité),
+   puis on dessine chaque case du plus froid au plus chaud et on applique un flou gaussien */
+const off = document.createElement('canvas');
+const heat = new CanvasLayer((ctx, m, s) => {
+  if (!show.heat) return;
+  const dpr = devicePixelRatio||1; off.width = s.x*dpr; off.height = s.y*dpr; const o = off.getContext('2d'); o.setTransform(dpr,0,0,dpr,0,0);
+  const r = Math.max(3, Math.min(40, 9/mpp())), cell = Math.max(2, r*0.8);
+  const acc = new Map();
+  for (const p of C.P){ if (!(show.sens1 && p[6]===1) && !(show.sens2 && p[6]===2)) continue;
+    const q = m.latLngToContainerPoint(sh(p[1],p[0])); if (q.x<-r||q.y<-r||q.x>s.x+r||q.y>s.y+r) continue;
+    const k = Math.round(q.x/cell)+','+Math.round(q.y/cell); const a = acc.get(k);
+    if (a){ a[0]+=q.x; a[1]+=q.y; a[2]+=p[2]; a[3]++; } else acc.set(k, [q.x,q.y,p[2],1]); }
+  const cells = [...acc.values()].map(a=>[a[0]/a[3], a[1]/a[3], a[2]/a[3]]).sort((a,b)=>a[2]-b[2]);
+  for (const c of cells){ o.fillStyle = col(c[2]); o.beginPath(); o.arc(c[0], c[1], r, 0, 7); o.fill(); }
+  ctx.save(); ctx.filter = `blur(${Math.max(1.5, r*0.45)}px)`; ctx.globalAlpha = .88; ctx.drawImage(off, 0, 0, s.x, s.y); ctx.restore();
+});
+/* capteurs : un point par capteur, décalé latéralement */
+const pts = new CanvasLayer((ctx, m, s) => {
+  PICK = [];
+  const sel = [0,1,2].filter(i=>show['s'+i]); const moy = show.moy; if (!sel.length && !moy) return;
+  const z = map.getZoom(), k = 1/mpp(), offPx = 2*k, r = Math.max(1.6, Math.min(5, 0.9*k));
+  for (const p of C.P){ if (!(show.sens1 && p[6]===1) && !(show.sens2 && p[6]===2)) continue;
+    const q = m.latLngToContainerPoint(sh(p[1],p[0])); if (q.x<-10||q.y<-10||q.x>s.x+10||q.y>s.y+10) continue;
+    const a = (p[7]||0)*Math.PI/180, lx = -Math.cos(a), ly = -Math.sin(a);   // vecteur « gauche » à l'écran
+    if (moy){ ctx.fillStyle = col(p[2]); ctx.beginPath(); ctx.arc(q.x, q.y, r, 0, 7); ctx.fill(); PICK.push([q.x,q.y,p,-1]); }
+    for (const i of sel){ const d = (1-i)*offPx; const x = q.x + lx*d, y = q.y + ly*d;
+      ctx.fillStyle = col(p[3+i]); ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); PICK.push([x,y,p,i]); } }
+});
+heat.addTo(map); pts.addTo(map);
+
+/* hexagones */
+const rend = L.canvas({padding:.5});
+const hexE = L.layerGroup(C.H.map(h => L.polygon(h[0].map(c=>sh(c[0],c[1])), {o:h[0], renderer:rend, stroke:true, weight:.6, color:'rgba(255,255,255,.35)', fillColor:col(h[1]), fillOpacity:.8})
+  .bindTooltip(`<b>${fmt(h[1])} lx</b> en moyenne<br>min ${fmt(h[2])} lx · U0 ${fmt(h[3],2)}<br>${h[4]} passage${h[4]>1?'s':''}`, {sticky:true})));
+const hexC = L.layerGroup(C.H.map(h => L.polygon(h[0].map(c=>sh(c[0],c[1])), {o:h[0], renderer:rend, stroke:true, weight:.6, color:'rgba(255,255,255,.35)', fillColor:h[1]>=META.seuil?'#22a352':'#d63c3c', fillOpacity:.6})
+  .bindTooltip(`<b>${fmt(h[1])} lx</b> (seuil ${META.seuil} lx)<br>${h[1]>=META.seuil?'conforme':'sous le seuil'}`, {sticky:true})));
+/* ouvrages */
+const FAMC = ['#2a7fe0','#ef7a2e','#14a88a'];
+const sup = L.layerGroup(C.S.map(s => L.circleMarker(sh(s[0],s[1]), {o:[s[0],s[1]], renderer:rend, radius:4, weight:1, color:'#fff', fillColor:FAMC[s[7]], fillOpacity:1})
+  .bindTooltip(`<b>${esc(s[2])}</b> · ${esc(s[3])}<br>${esc(s[4])}<br>Max. au passage : <b>${fmt(s[5])} lx</b>${s[10]!=null?`<br>Recalé de ${fmt(s[10])} m sur le point lumineux${s[12]?'':' (1 seul passage, indicatif)'}`:''}`)));
+const offL = L.layerGroup(C.S.filter(s=>s[6]).map(s => L.circleMarker(sh(s[0],s[1]), {o:[s[0],s[1]], renderer:rend, radius:9, weight:3, color:'#ff3b3b', fill:false})
+  .bindTooltip(`<b>${esc(s[2])}</b> · ${esc(s[3])}<br>Suspect éteint : ${fmt(s[5])} lx au passage`)));
+const det = L.layerGroup(C.D.map(d => L.circleMarker(sh(d[0],d[1]), {o:[d[0],d[1]], renderer:rend, radius:8, weight:2, dashArray:'3 3', color:'#ffc53d', fill:false})
+  .bindTooltip(`<b>Source non inventoriée</b><br>Pic ${fmt(d[2])} lx, vue sur ${d[3]} passages`)));
+const posTip = s => `<b>${esc(s[2])}</b> · ${esc(s[3])}<br>Position Excel fausse de <b>${fmt(s[10])} m</b><br>Excel : ${s[8].toFixed(6)}, ${s[9].toFixed(6)}<br>Mesurée : ${s[0].toFixed(6)}, ${s[1].toFixed(6)}`;
+const pos = L.layerGroup(C.S.filter(s=>s[11]).flatMap(s => [
+  L.polyline([sh(s[8],s[9]), sh(s[0],s[1])], {o:[[s[8],s[9]],[s[0],s[1]]], renderer:rend, weight:2, color:'#c77dff', dashArray:'4 3'}).bindTooltip(posTip(s), {sticky:true}),
+  L.circleMarker(sh(s[8],s[9]), {o:[s[8],s[9]], renderer:rend, radius:4, weight:2, color:'#bbb', fill:false}).bindTooltip(posTip(s)),
+  L.circleMarker(sh(s[0],s[1]), {o:[s[0],s[1]], renderer:rend, radius:5, weight:1.5, color:'#fff', fillColor:'#c77dff', fillOpacity:1}).bindTooltip(posTip(s))]));
+document.getElementById('seuil-pos').textContent = META.seuil_pos ?? 5;
+offL.addTo(map); pos.addTo(map);
+const LAY = {hex:hexE, conf:hexC, sup, off:offL, det, pos};
+function applyOffset(){
+  for (const g of Object.values(LAY)) g.eachLayer(l => { const o = l.options.o;
+    if (l.setLatLngs) l.setLatLngs(o.map(c=>sh(c[0],c[1]))); else l.setLatLng(sh(o[0],o[1])); });
+  heat._reset(); pts._reset();
+  document.getElementById('recal-val').textContent = `Est ${OFF.e>=0?'+':''}${OFF.e.toFixed(1)} m · Nord ${OFF.n>=0?'+':''}${OFF.n.toFixed(1)} m`;
+  document.getElementById('recal-cli').textContent = `--recalage-est-m ${OFF.e.toFixed(1)} --recalage-nord-m ${OFF.n.toFixed(1)}`;
+  try { localStorage.setItem('getys-recalage-'+META.ville, JSON.stringify(OFF)); } catch(e) {}
+}
+for (const [id,de,dn] of [['r-o',-.5,0],['r-e',.5,0],['r-n',0,.5],['r-s',0,-.5]])
+  document.getElementById(id).onclick = () => { OFF.e += de; OFF.n += dn; applyOffset(); };
+document.getElementById('r-0').onclick = () => { OFF.e = META.recal?.[0]||0; OFF.n = META.recal?.[1]||0; applyOffset(); };
+applyOffset();
+
+/* ---------- panneau ---------- */
+for (const k of Object.keys(show)){ const el = document.getElementById('c-'+k); if (!el) continue; el.checked = show[k];
+  el.addEventListener('change', () => { show[k] = el.checked;
+    if (k==='hex' && show.hex){ show.conf=false; document.getElementById('c-conf').checked=false; map.removeLayer(hexC); }
+    if (k==='conf' && show.conf){ show.hex=false; document.getElementById('c-hex').checked=false; map.removeLayer(hexE); }
+    document.getElementById('note-conf').hidden = !show.conf;
+    if (LAY[k]) { show[k] ? LAY[k].addTo(map) : map.removeLayer(LAY[k]); }
+    heat._reset(); pts._reset(); }); }
+
+/* ---------- info-bulle des points ---------- */
+const tip = document.getElementById('tip'); let raf = 0;
+map.on('mousemove', e => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0;
+  const mx = e.containerPoint.x, my = e.containerPoint.y; let best = null, bd = 64;
+  for (const t of PICK){ const d = (t[0]-mx)**2 + (t[1]-my)**2; if (d < bd){ bd = d; best = t; } }
+  if (!best && show.heat){ for (const p of C.P){ const q = map.latLngToContainerPoint(sh(p[1],p[0])); const d=(q.x-mx)**2+(q.y-my)**2; if (d<bd){ bd=d; best=[q.x,q.y,p,-1]; } } }
+  if (!best){ tip.hidden = true; return; }
+  const p = best[2];
+  tip.innerHTML = `${best[3]>=0 ? `Capteur ${esc(C.capteurs[best[3]])} : <b>${fmt(p[3+best[3]])} lx</b><br>` : ''}Médiane 3 capteurs : <b>${fmt(p[2])} lx</b><br>G ${fmt(p[3])} · C ${fmt(p[4])} · D ${fmt(p[5])} lx<br>Sens ${p[6]} (cap ${CARD[Math.round(((p[7]||0)%360)/45)%8]}) · ${hfmt(p[8])}`;
+  tip.hidden = false; tip.style.left = Math.min(mx+14, innerWidth-tip.offsetWidth-8)+'px'; tip.style.top = Math.max(8, my-tip.offsetHeight-10)+'px'; }); });
+map.on('mouseout movestart', () => tip.hidden = true);
+</script>
+</body>
+</html>

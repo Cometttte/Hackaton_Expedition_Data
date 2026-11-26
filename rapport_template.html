@@ -1,0 +1,359 @@
+<title>Rapport de tournée luxmétrique</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Mise en page : une colonne de lecture (1100px max), carte pleine largeur, constats en sections texte + graphique */
+:root{
+  --bg:#f4f6f9; --panel:#ffffff; --ink:#172031; --ink-2:#586377; --rule:#dce1e9; --grid:#e9edf2; --accent:#1a5bb0;
+  --s1:#2a7fe0; --s2:#ef7a2e; --s3:#14a88a; --good:#16a34a; --warn:#e5a50a; --crit:#d63c3c; --mapbg:#ffffff;
+  --f-display:"Barlow Condensed","Arial Narrow",sans-serif; --f-body:"IBM Plex Sans",system-ui,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ color-scheme:dark;
+  --bg:#11151c; --panel:#1a2029; --ink:#e8ecf2; --ink-2:#9ba5b5; --rule:#2c3441; --grid:#242b36; --accent:#6aabf1;
+  --s1:#4a98f0; --s2:#f08a45; --s3:#2cbf9f; --good:#3fbf6a; --warn:#f0bb3a; --crit:#ef6464; --mapbg:#0d1117; } }
+:root[data-theme="dark"]{ color-scheme:dark;
+  --bg:#11151c; --panel:#1a2029; --ink:#e8ecf2; --ink-2:#9ba5b5; --rule:#2c3441; --grid:#242b36; --accent:#6aabf1;
+  --s1:#4a98f0; --s2:#f08a45; --s3:#2cbf9f; --good:#3fbf6a; --warn:#f0bb3a; --crit:#ef6464; --mapbg:#0d1117; }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--f-body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 64px}
+.wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:44px}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;letter-spacing:.01em;text-wrap:balance;margin:0;line-height:1.1}
+h1{font-size:clamp(32px,5vw,48px)} h2{font-size:28px} h3{font-size:19px}
+p{margin:0;max-width:70ch} .muted{color:var(--ink-2)} .small{font-size:13px}
+.eyebrow{font:500 12px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--accent)}
+header{display:flex;flex-direction:column;gap:14px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--rule);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+.kpi{background:var(--panel);padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.kpi b{font:600 29px/1 var(--f-display);font-variant-numeric:tabular-nums}
+.kpi span{font-size:13px;color:var(--ink-2)}
+.kpi.alert b{color:var(--crit)}
+.kpi small{font-size:12px;color:var(--ink-2)}
+section{display:flex;flex-direction:column;gap:16px}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:28px;align-items:start}
+.two>*{min-width:0}
+@media (max-width:780px){.two{grid-template-columns:1fr}}
+.col{display:flex;flex-direction:column;gap:12px}
+.panel{background:var(--panel);border:1px solid var(--rule);border-radius:6px;padding:16px;min-width:0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:24px}
+.mapbox{position:relative;background:var(--mapbg);border:1px solid var(--rule);border-radius:6px;overflow:hidden}
+canvas#map{display:block;width:100%;aspect-ratio:4/3;max-width:100%;cursor:crosshair;touch-action:none}
+.ctrls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ctrls button{font:500 13px var(--f-body);color:var(--ink);background:var(--panel);border:1px solid var(--rule);border-radius:4px;padding:6px 12px;cursor:pointer}
+.ctrls button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.maplink{font:500 13px var(--f-body);color:var(--accent);text-decoration:none;padding:6px 4px}
+.maplink:hover{text-decoration:underline}
+.ctrls .sep{width:1px;height:22px;background:var(--rule)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--ink-2);align-items:center}
+.sw{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.ramp{display:inline-block;width:140px;height:8px;border-radius:2px;vertical-align:middle;margin:0 6px}
+.tip{position:absolute;pointer-events:none;background:var(--panel);color:var(--ink);border:1px solid var(--rule);border-radius:4px;padding:8px 10px;font-size:12.5px;line-height:1.45;box-shadow:0 4px 14px rgba(0,0,0,.15);max-width:270px;z-index:5}
+.tip b{font-family:var(--f-mono);font-weight:500}
+svg text{fill:var(--ink-2);font:11px var(--f-mono)}
+svg .lbl{fill:var(--ink);font:12px var(--f-body)}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{font:500 11px var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);text-align:left;border-bottom:1px solid var(--rule);padding:6px 8px;white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid var(--grid);font-variant-numeric:tabular-nums}
+td.n,th.n{text-align:right;font-family:var(--f-mono);white-space:nowrap}
+.pill{font:500 11px var(--f-mono);padding:2px 6px;border-radius:3px;border:1px solid var(--rule);white-space:nowrap}
+.pill.crit{border-color:var(--crit);color:var(--crit)} .pill.warn{border-color:var(--warn);color:var(--warn)} .pill.good{border-color:var(--good);color:var(--good)}
+ul.notes{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:8px;max-width:78ch}
+details summary{cursor:pointer;color:var(--accent);font-weight:500}
+details[open] summary{margin-bottom:10px}
+footer{font-size:12.5px;color:var(--ink-2);border-top:1px solid var(--rule);padding-top:16px;display:flex;flex-direction:column;gap:6px}
+code{font-family:var(--f-mono);font-size:.92em}
+.scroll{max-height:420px;overflow:auto} .mono{font-family:"IBM Plex Mono",ui-monospace,monospace}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<header>
+  <span class="eyebrow" id="eyebrow">Éclairage public · rapport de fin de tournée</span>
+  <h1 id="h1">Relevé luxmétrique</h1>
+  <p class="muted" id="intro"></p>
+  <div class="kpis" id="kpis"></div>
+</header>
+
+<section>
+  <h2>Carte du relevé</h2>
+  <div class="ctrls" role="group" aria-label="Couches de la carte">
+    <button id="b-lux" aria-pressed="true">Mesures</button>
+    <button id="b-lum" aria-pressed="true">Lampadaires estimés</button>
+    <span class="sep"></span>
+    <button id="b-reset" aria-pressed="false">Recentrer</button>
+    <span class="sep"></span>
+    <a class="maplink" href="carte.html" target="_blank" rel="noopener">Ouvrir la carte satellite ↗</a>
+  </div>
+  <div class="mapbox"><canvas id="map" aria-label="Carte du trajet coloré par éclairement et des lampadaires estimés"></canvas><div class="tip" id="tip" hidden></div></div>
+  <div class="legend" id="legend"></div>
+  <p class="muted small">Molette ou pincement pour zoomer, glisser pour déplacer. Survolez un lampadaire pour son côté, son type de lampe et sa puissance estimée. Coordonnées Lambert 93, sans fond de plan.</p>
+</section>
+
+<section class="two">
+  <div class="col">
+    <h2 id="l-title">Lampadaires estimés à partir de l'éclairement</h2>
+    <div id="l-text" class="col"></div>
+  </div>
+  <div class="col">
+    <div class="panel"><h3>Côté de la voie</h3><svg id="cotes" viewBox="0 0 560 150" width="100%" role="img" aria-label="Répartition des lampadaires par côté"></svg></div>
+    <div class="panel"><h3>Implantation par tronçon de 100 m</h3><svg id="impl" viewBox="0 0 560 150" width="100%" role="img" aria-label="Implantation des tronçons"></svg></div>
+  </div>
+</section>
+
+<section>
+  <h2 id="t-title">Type de lampe et consommation</h2>
+  <div id="t-text" class="col"></div>
+  <div class="panel tbl"><table id="t-types"></table></div>
+</section>
+
+<section>
+  <h2>Fiabilité des estimations</h2>
+  <div id="v-text" class="col"></div>
+  <div class="panel tbl"><table id="t-valid"></table></div>
+</section>
+
+<section class="two">
+  <div class="col">
+    <h2 id="q-title">Qualité des mesures</h2>
+    <div id="q-text" class="col"></div>
+  </div>
+  <div class="col">
+    <div class="panel"><h3>Distribution de l'éclairement (un point tous les 2 m roulés)</h3><svg id="hist" viewBox="0 0 560 240" width="100%" role="img" aria-label="Histogramme des éclairements"></svg></div>
+    <details><summary>Voir les pics aberrants retirés</summary><div class="panel tbl scroll"><table id="t-ab"></table></div></details>
+  </div>
+</section>
+
+<section class="two">
+  <div class="col">
+    <h2>Méthode statistique et multi-passages</h2>
+    <div id="m-text" class="col"></div>
+  </div>
+  <div class="panel tbl"><h3 style="margin-bottom:8px">Éclairement de la tournée selon la pondération</h3><table id="t-meth"></table>
+    <p class="muted small" style="margin-top:8px">Pondération au temps : chaque échantillon à 50 Hz pèse autant, les rues parcourues lentement comptent plus. Pondération à la distance : chaque mètre de voie pèse autant.</p></div>
+</section>
+
+<section class="two">
+  <div class="col">
+    <h2 id="a-title">Abaissement nocturne</h2>
+    <div id="a-text" class="col"></div>
+  </div>
+  <div class="panel"><h3>Éclairement médian par minute, heure locale</h3><svg id="ts" viewBox="0 0 560 240" width="100%" role="img" aria-label="Évolution de l'éclairement médian au cours de la tournée"></svg></div>
+</section>
+
+<section>
+  <h2>Hypothèses et limites</h2>
+  <ul class="notes" id="hyp"></ul>
+</section>
+
+<footer id="foot"></footer>
+</div>
+
+<script>
+const D = /*__DATA__*/null;
+const M = D.map, K = D.kpi, Q = D.qualite, PR = D.meta.params, TY = D.types_libelles, V = D.validation || {};
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const isDark = () => (matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme !== 'light') || document.documentElement.dataset.theme === 'dark';
+const RAMP = ['#d6e8fd','#a6cdf7','#71aff1','#3b8fe9','#2370cd','#1757ac','#0e3d7e'];
+const ramp = () => isDark() ? [...RAMP].reverse() : RAMP;
+function lc(v){ const r = ramp(); const t = Math.max(0, Math.min(1, v/50))*(r.length-1); return r[Math.round(t)]; }
+const fmt = (v,d=1) => v==null||isNaN(v) ? '–' : Number(v).toLocaleString('fr-FR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const n0 = v => fmt(v,0);
+const esc = s => String(s??'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pct = (a,b) => b ? Math.round(100*a/b) : 0;
+const nice = f => String(f).toLowerCase().replace(/^./, c => c.toUpperCase());
+const P = (html) => `<p>${html}</p>`;
+const hfmt = h => { if (h==null) return '–'; const hh=Math.floor(h), mm=Math.floor((h-hh)*60); return mm ? `${hh}h${String(mm).padStart(2,'0')}` : `${hh}h`; };
+
+const TCOL = {sodium:'#ef7a2e', blanc_2700:'#e5b80a', led_3000:'#2a7fe0', blanc_neutre:'#14a88a', blanc_froid:'#8b5cf6', inconnu:'#8a93a3'};
+const TCOURT = {sodium:'Sodium HP', blanc_2700:'Blanc 2 700 K', led_3000:'LED 3 000 K', blanc_neutre:'Blanc neutre', blanc_froid:'Blanc froid', inconnu:'Indéterminé'};
+const CLAB = {gauche:'à gauche', droite:'à droite', non_tranche:'côté non tranché'};
+const ILAB = {gauche:'un seul côté (gauche)', droite:'un seul côté (droite)', deux_cotes:'les deux côtés', indetermine:'indéterminé'};
+
+/* ---------- textes ---------- */
+document.title = `Tournée ${D.meta.ville} ${D.meta.date}`;
+document.getElementById('h1').textContent = `${D.meta.ville}, relevé luxmétrique du ${D.meta.date}`;
+document.getElementById('intro').textContent = `Tournée de ${D.meta.debut} à ${D.meta.fin} (heure locale). Seule source : le fichier de mesure ${D.meta.fichier_tdms} (${Q.capteurs.length} luxmètres à ${n0(Q.fs)} Hz, GNSS ${Q.gnss_source}, chromamètre). Aucun inventaire n'est utilisé : les lampadaires, leur côté, leur type de lampe et leur puissance sont déduits des mesures. Les capteurs sont sur une remorque, à ${fmt(PR.hauteur_capteurs_m)} m du sol : ce sont des éclairements horizontaux à cette hauteur, pas des éclairements au sol normatifs.`;
+const kp = [
+  [`${fmt(K.dist_km)} km`, `parcourus en ${fmt(K.duree_h)} h`],
+  [`${fmt(K.E_med)} lx`, `éclairement médian (moyenne ${fmt(K.E_moy)} lx)`],
+  [`${K.part_sup_seuil} %`, `de la voie ≥ ${fmt(PR.seuil_emoy_lx,0)} lx`],
+  [`${n0(K.n_lampadaires)}`, `lampadaires estimés, un tous les ${n0(K.interdistance_med)} m`],
+  [`${n0(K.puissance_tot_kw)} kW`, `puissance installée estimée <small>(${n0(K.puissance_tot_min_kw)} à ${n0(K.puissance_tot_max_kw)} kW)</small>`],
+  [`${n0(K.energie_an_mwh)} MWh`, `consommés par an (${n0(D.heures_an)} h d'allumage)`],
+];
+document.getElementById('kpis').innerHTML = kp.map(k => `<div class="kpi"><b>${k[0]}</b><span>${k[1]}</span></div>`).join('');
+
+const nGD = K.n_gauche + K.n_droite, TR = K.troncons || {}, nTr = Object.values(TR).reduce((a,b)=>a+b,0);
+document.getElementById('l-title').textContent = `${n0(K.n_lampadaires)} lampadaires repérés par la seule lumière`;
+document.getElementById('l-text').innerHTML = [
+  P(`Chaque passage sous un lampadaire crée une cloche dans l'éclairement. L'outil a trouvé ${n0(K.n_pics)} pics (au moins ${fmt(PR.prominence_min_lx,0)} lx au-dessus du voisinage). Les pics de passages différents situés à moins de ${fmt(PR.rayon_regroupement_m,0)} m sur la trace sont le même lampadaire : ${n0(K.n_lampadaires)} lampadaires, dont ${n0(K.n_multi)} vus sur au moins deux passages.`),
+  P(`<b>Position.</b> Le maximum de la cloche situe le lampadaire le long de la voie, à 1 à 3 m près (calage GPS / remorque compris). Sa distance au bord de la voie ne se mesure pas avec des luxmètres : il est placé à ${fmt(PR.dist_laterale_m,1)} m de la trace, distance typique.`),
+  P(`<b>Gauche ou droite.</b> Les luxmètres ${esc(String(K.capteur_gauche).replace('L','Lux'))} (gauche) et ${esc(String(K.capteur_droit).replace('L','Lux'))} (droite) sont écartés de 0,98 m. Celui qui est du côté du feu reçoit un peu plus de lumière. ${n0(K.n_gauche)} lampadaires sont à gauche et ${n0(K.n_droite)} à droite (gauche et droite du sens 1 de chaque rue, voir la carte). ${n0(K.n_non_tranche)} restent non tranchés : feu au-dessus de la voie, deux feux face à face, ou feu éloigné. Ces trois cas donnent la même mesure.`),
+  P(`<b>Un côté ou les deux.</b> Sur ${n0(nTr - (TR.indetermine||0))} tronçons de ${n0(PR.troncon_m)} m qualifiés, ${n0(TR.deux_cotes||0)} ont des lampadaires des deux côtés (bilatéral ou quinconce) et ${n0((TR.gauche||0)+(TR.droite||0))} d'un seul côté.`),
+].join('');
+
+function bars(id, rows){ const s = document.getElementById(id); s.innerHTML=''; const W=560, m={l:140,r:100,t:6,b:6}, rowH=34, H=m.t+m.b+rows.length*rowH; s.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  const tot = rows.reduce((a,r)=>a+r[1],0), mx = Math.max(1,...rows.map(r=>r[1])), x = v => v/mx*(W-m.l-m.r);
+  rows.forEach((r,i) => { const cy = m.t+i*rowH+rowH/2; txt(s,m.l-10,cy+4,r[0],{'text-anchor':'end',class:'lbl'});
+    const b = el(s,'rect',{x:m.l,y:cy-10,width:Math.max(2,x(r[1])),height:20,rx:3,fill:r[2]});
+    txt(s,m.l+x(r[1])+6,cy+4,`${n0(r[1])} (${pct(r[1],tot)} %)`,{});
+    addTip(s, b, `<b>${esc(r[0])}</b><br>${n0(r[1])} sur ${n0(tot)}`); }); }
+
+const TT = D.types;
+const sod = TT.find(t=>t.type==='sodium'), nW = TT.filter(t=>!['sodium','inconnu'].includes(t.type)).reduce((a,t)=>a+t.n,0);
+document.getElementById('t-title').textContent = sod ? `${pct(sod.n, K.n_lampadaires)} % de sodium, ${pct(nW, K.n_lampadaires)} % de sources blanches` : 'Type de lampe et consommation';
+document.getElementById('t-text').innerHTML = [
+  P(`<b>Type de lampe.</b> Le chromamètre mesure la température de couleur (Tcp) au passage sous chaque lampadaire. Il renvoie 0 sous environ 2 200 K : c'est la signature du sodium haute pression (≈ 2 000 K, lumière orangée). Pour les sources blanches, la Tcp distingue le blanc chaud 2 700 K, les LED 3 000 K, le blanc neutre et le blanc froid. Une LED 2 700 K et une lampe aux iodures métalliques céramiques (type CosmoWhite) ont la même Tcp : elles restent dans la même classe.`),
+  P(`<b>Puissance.</b> L'éclairement mesuré ne renseigne presque pas sur les watts : la hauteur, l'optique, la distance et le vieillissement pèsent bien plus. Chaque lampadaire reçoit donc la puissance moyenne de son type, avec une fourchette. Pris un à un, l'écart est grand. Sur l'ensemble de la tournée, les erreurs se compensent : <b>${n0(K.puissance_tot_kw)} kW installés</b> (fourchette ${n0(K.puissance_tot_min_kw)} à ${n0(K.puissance_tot_max_kw)} kW), soit ${n0(K.conso_tot_kw)} kW consommés avec les pertes des ballasts et environ <b>${n0(K.energie_an_mwh)} MWh par an</b> pour ${n0(D.heures_an)} heures d'allumage.`),
+  sod ? P(`Le sodium représente ${n0(sod.c_tot_kw)} kW sur ${n0(K.conso_tot_kw)} kW consommés. Le remplacer par des LED de flux équivalent (hypothèse courante : environ 40 % de puissance en moins) économiserait de l'ordre de ${n0(sod.c_tot_kw*0.4*D.heures_an/1000)} MWh par an. C'est un ordre de grandeur, à confirmer luminaire par luminaire.`) : '',
+].join('');
+document.getElementById('t-types').innerHTML = '<tr><th>Type estimé</th><th class="n">Lampadaires</th><th class="n">Tcp médiane K</th><th class="n">Puissance type W</th><th class="n">Fourchette W</th><th class="n">Installé kW</th><th class="n">Consommé kW</th><th class="n">Éclairement au passage lx</th></tr>' +
+  TT.map(t => `<tr><td><span class="sw" style="background:${TCOL[t.type]}"></span>${esc(t.libelle)}</td><td class="n">${n0(t.n)}</td><td class="n">${t.type==='sodium'?'< 2 200':(t.tcp!=null?n0(t.tcp):'–')}</td><td class="n">${n0(t.p_med)}</td><td class="n">${t.fourchette[0]}–${t.fourchette[1]}</td><td class="n">${fmt(t.p_tot_kw)}</td><td class="n">${fmt(t.c_tot_kw)}</td><td class="n">${fmt(t.E_pic)}</td></tr>`).join('');
+
+document.getElementById('v-text').innerHTML = [
+  P(`L'outil n'utilise que le fichier de mesure. Pour savoir ce que valent ses estimations, elles ont été comparées une fois, après coup, à l'inventaire d'Ormesson-sur-Marne (relevé du 18/03/2025). Ces chiffres donnent la précision à attendre sur une autre tournée, avec le même matériel.`),
+  `<p class="muted small">L'inventaire a lui-même des erreurs de position (plusieurs mètres pour environ 170 supports), ce qui rend ces chiffres plutôt pessimistes.</p>`
+].join('');
+document.getElementById('t-valid').innerHTML = '<tr><th>Estimation</th><th>Précision constatée à Ormesson</th></tr>' + (V.lignes||[]).map(r => `<tr><td>${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('');
+
+const qc = Q.q_counts, nq = Object.values(qc).reduce((a,b)=>a+b,0);
+const qlab = {'1':'GPS autonome','2':'différentiel (DGPS)','4':'RTK fixe','5':'RTK flottant'};
+const qtxt = Object.entries(qc).sort((a,b)=>b[1]-a[1]).map(([k,v]) => `${pct(v,nq)} % en ${qlab[k]||'qualité '+k}`).join(', ');
+const cc = Q.corr_capteurs;
+const qok = Math.min(...cc) > 0.85 && Q.hdop_med < 2;
+document.getElementById('q-title').textContent = qok ? 'Les mesures sont exploitables' : 'Qualité des mesures à vérifier';
+document.getElementById('q-text').innerHTML = [
+  P(`GNSS : ${n0(Q.n_pos)} positions (${qtxt}), HDOP médian ${fmt(Q.hdop_med)}, ${n0(Q.nsat_med)} satellites${Q.trous_gnss?`, ${Q.trous_gnss} coupures de plus de 2 s`:', aucune coupure de plus de 2 s'}.`),
+  (D.calage && D.calage.decalage_m!=null) ? P(`Calage des capteurs sur le GPS : en comparant les rues parcourues dans les deux sens, l'outil trouve une latence d'horodatage de ${fmt(D.calage.latence_s,2)} s et un décalage fixe de ${fmt(D.calage.decalage_m,1)} m entre l'antenne et les capteurs de la remorque. Sans correction, à 33 km/h, les mesures tombaient ${fmt(Math.abs(D.calage.classes.length?D.calage.classes[D.calage.classes.length-1][1]:0),1)} m trop loin. Après correction, la concordance aller/retour passe de ${fmt((D.calage.classes.at(-1)||[0,0,0,0])[3],2)} à ${fmt((D.calage.classes.at(-1)||[0,0,0])[2],2)} à cette vitesse.`) : '',
+  P(`Les trois luxmètres concordent (corrélations ${cc.map(c=>fmt(c,2)).join(', ')})${Q.corr_chromametre!=null?` et le chromamètre suit leur médiane (r = ${fmt(Q.corr_chromametre,2)})`:''}.`),
+  P(`La moitié des mètres roulés est entre ${fmt(K.E_p25)} et ${fmt(K.E_p75)} lx et ${fmt(K.part_sup50)} % dépassent 50 lx.`),
+  P(`Pics aberrants retirés : ${Q.n_trop_haut} pics au-dessus de ${n0(PR.lux_max_plausible)} lx (valeur non plausible pour de l'éclairage public), ${Q.n_trop_bref} pics trop étroits (moins de ${fmt(PR.pic_largeur_min_m,0)} m de large à mi-hauteur, alors qu'un luminaire éclaire plusieurs mètres de route) et ${Q.n_var_arret} variations de lumière véhicule arrêté. Cela représente ${fmt(Q.part_aberrants,2)} % des échantillons, remplacés par interpolation. ${K.n_pas_incoh} passages nettement plus lumineux que les autres passages au même endroit (phares, vitrine) sont aussi écartés.`),
+  `<p class="muted small">Autres corrections : ${fmt(Q.part_negatifs,1)} % d'échantillons négatifs (soustraction d'offset capteur de ${Q.capteurs.map(c=>fmt(c.offset,1)).join(', ')} lx) ramenés à 0 ; ${fmt(Q.part_pics,2)} % d'échantillons isolés sur un seul capteur corrigés par filtre de Hampel (0,5 s) ; médiane des 3 capteurs. Horloge du PC d'acquisition décalée de ${fmt(Q.decalage_horloge_s,1)} s par rapport au GPS, corrigée. Arrêts (< ${PR.vitesse_min} m/s) : ${fmt(Q.part_arret)} % du temps, exclus.</p>`
+].join('');
+
+document.getElementById('t-ab').innerHTML = '<tr><th>Heure</th><th class="n">Pic lx</th><th class="n">Fond lx</th><th class="n">Durée s</th><th class="n">Largeur m</th><th>Motif</th></tr>' +
+  Q.aberrants.map(a => `<tr><td>${esc(a[0])}</td><td class="n">${n0(a[1])}</td><td class="n">${n0(a[4])}</td><td class="n">${fmt(a[2],2)}</td><td class="n">${fmt(a[3])}</td><td><span class="pill ${a[5]==='trop haut'?'crit':'warn'}">${esc(a[5])}</span></td></tr>`).join('');
+const ME = D.methodes;
+document.getElementById('t-meth').innerHTML = '<tr><th>Pondération</th><th class="n">Moyenne lx</th><th class="n">Médiane lx</th></tr>' +
+  [['Temps, signal brut', ME.temps_brut], ['Temps, signal filtré, hors arrêts', ME.temps_filtre], ['Distance (pas de 2 m), retenue', ME.distance]]
+  .map(r => `<tr><td>${r[0]}</td><td class="n">${fmt(r[1].moy)}</td><td class="n">${fmt(r[1].med)}</td></tr>`).join('');
+document.getElementById('m-text').innerHTML = [
+  P(`Les mesures sont ré-échantillonnées à un point tous les ${fmt(PR.pas_m,0)} m roulés, hors arrêts : chaque mètre de voie pèse autant, quelle que soit la vitesse.`),
+  P(`Répétabilité : là où la voie a été parcourue plusieurs fois, l'éclairement moyen d'un passage à l'autre varie de ${K.cv_maille_med??'–'} % en médiane, et le pic d'un même lampadaire de ${K.cv_passages_med??'–'} %. C'est l'ordre de grandeur de l'incertitude d'une mesure isolée.`),
+].join('');
+
+const AB = D.abaissement;
+document.getElementById('a-title').textContent = AB.n < 10 ? 'Abaissement nocturne : trop peu de repassages' : (AB.ratio_med < 0.8 ? `L'abaissement de ${hfmt(PR.heure_abaissement)} est visible` : `Pas d'abaissement visible après ${hfmt(PR.heure_abaissement)}`);
+document.getElementById('a-text').innerHTML = [
+  P(`Comparaison appariée : on compare le pic d'un même lampadaire vu avant et après ${hfmt(PR.heure_abaissement)}. ${AB.n} lampadaires sont dans ce cas.`),
+  AB.n ? P(`Après ${hfmt(PR.heure_abaissement)}, leur pic vaut ${n0((AB.ratio_med||0)*100)} % de la valeur d'avant en médiane. ${AB.n_abaisses} d'entre eux (${AB.part_abaisses} %) baissent de plus de 30 %.`) : '',
+  P(AB.n < 10 ? `C'est trop peu pour conclure. Pour mesurer l'abaissement, il faut repasser après ${hfmt(PR.heure_abaissement)} dans des rues déjà parcourues.` : (AB.ratio_med < 0.8 ? `La baisse est cohérente avec un abaissement de puissance.` : `Les lampadaires repassés ne semblent pas abaissés à cette heure-là.`)),
+].join('');
+
+const hyp = [
+  `<b>Aucun inventaire.</b> Tout est déduit du fichier .tdms. Les lampadaires éteints, ou trop loin de la trace (plus de 10 à 15 m), ne sont pas vus.`,
+  `<b>Position latérale.</b> Le lampadaire est placé à ${fmt(PR.dist_laterale_m,1)} m de la trace, du côté mesuré. Sur le terrain, cette distance va de 4 à 7 m dans la moitié des cas.`,
+  `<b>Deux côtés.</b> Avec deux luxmètres écartés de 0,98 m, un feu au-dessus de la voie et deux feux face à face donnent la même mesure. La présence de lampadaires des deux côtés se juge donc par tronçon de ${n0(PR.troncon_m)} m, à partir des lampadaires tranchés.`,
+  `<b>Puissance.</b> Puissances moyennes par type étalonnées sur l'inventaire d'Ormesson. Dans une autre commune, avec un parc différent (LED récentes très basse puissance, par exemple), il faudra les ajuster dans <code>getys_analyse.py</code>.`,
+  `<b>Mesure sur remorque.</b> Éclairement horizontal à ${fmt(PR.hauteur_capteurs_m)} m du sol, sur l'axe de circulation. Ce n'est pas la grille de calcul normative au sol, mais c'est stable d'une tournée à l'autre.`,
+  `<b>Seuil de ${fmt(PR.seuil_emoy_lx,0)} lx.</b> Repère provisoire, en l'absence des classes d'éclairage des voies (EN 13201).`,
+  `<b>Heure locale.</b> Europe/Paris, déduite de l'heure UTC du GPS après correction du décalage d'horloge du PC.`,
+];
+document.getElementById('hyp').innerHTML = hyp.map(h=>`<li>${h}</li>`).join('');
+const T = D.temps;
+document.getElementById('foot').innerHTML = `<span>Source : <code>${esc(D.meta.fichier_tdms)}</code> (acquisition du ${D.meta.date}).</span><span>Rapport généré automatiquement le ${D.meta.genere}, traitement complet en ${fmt(T.total,1)} s. Exports joints : <code>mesures_pas2m.csv</code>, <code>lampadaires_estimes.csv</code>, <code>lampadaires_estimes.geojson</code>, <code>resume.json</code>.</span><span>Analyse automatique, à valider avant usage contractuel.</span>`;
+
+/* ---------- carte ---------- */
+const cv = document.getElementById('map'), ctx = cv.getContext('2d'), tip = document.getElementById('tip');
+const show = {lux:true, lum:true};
+let xs = M.P.map(p=>p[0]), ys = M.P.map(p=>p[1]);
+const bx = [Math.min(...xs), Math.max(...xs)], by = [Math.min(...ys), Math.max(...ys)];
+let view = {k:1, dx:0, dy:0}, Tm = null;
+const sortedP = [...M.P].sort((a,b)=>a[2]-b[2]);
+function draw(){
+  const w = cv.clientWidth, h = cv.clientHeight, dpr = devicePixelRatio || 1;
+  cv.width = w*dpr; cv.height = h*dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
+  const pad = 16, s0 = Math.min((w-2*pad)/(bx[1]-bx[0]), (h-2*pad)/(by[1]-by[0])), s = s0*view.k;
+  const cx = (bx[0]+bx[1])/2, cy = (by[0]+by[1])/2;
+  Tm = {X: x => w/2 + (x-cx)*s + view.dx, Y: y => h/2 - (y-cy)*s + view.dy, s};
+  ctx.fillStyle = css('--mapbg'); ctx.fillRect(0,0,w,h);
+  if (show.lux){ const r = Math.max(1.4, Math.min(4, s*1.6));
+    for (const p of sortedP){ ctx.fillStyle = lc(p[2]); ctx.beginPath(); ctx.arc(Tm.X(p[0]), Tm.Y(p[1]), r, 0, 7); ctx.fill(); } }
+  if (show.lum){ const r = Math.max(2.4, Math.min(6, s*1.3)), ring = css('--mapbg');
+    for (const q of M.L){ ctx.beginPath(); ctx.arc(Tm.X(q[0]), Tm.Y(q[1]), r, 0, 7); ctx.fillStyle = TCOL[q[3]]; ctx.fill();
+      ctx.lineWidth = q[2]==='non_tranche' ? 1.5 : 1; ctx.strokeStyle = q[2]==='non_tranche' ? css('--ink') : ring; if (q[2]==='non_tranche') ctx.setLineDash([2,2]); ctx.stroke(); ctx.setLineDash([]); } }
+  let L = 500, lab = '500 m'; if (L*s > w/3){ L = 100; lab = '100 m'; } if (L*s > w/3){ L = 20; lab = '20 m'; }
+  ctx.strokeStyle = css('--ink-2'); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(16, h-16); ctx.lineTo(16+L*s, h-16); ctx.stroke();
+  ctx.fillStyle = css('--ink-2'); ctx.font = '11px "IBM Plex Mono", monospace'; ctx.fillText(lab, 16, h-22);
+}
+function hover(mx, my){
+  let best = null, bd = 12*12, html = '';
+  if (show.lum) for (const q of M.L){ const dx = Tm.X(q[0])-mx, dy = Tm.Y(q[1])-my, d = dx*dx+dy*dy; if (d < bd){ bd = d; best = q; } }
+  if (best) html = `<b>Lampadaire ${esc(CLAB[best[2]])}</b><br>${esc(TY[best[3]])}${best[3]==='sodium'?'<br>Tcp < 2 200 K':(best[7]!=null?'<br>Tcp '+n0(best[7])+' K':'')}<br>Puissance estimée ≈ ${n0(best[4])} W<br>Pic ${fmt(best[5])} lx, ${best[6]} passage${best[6]>1?'s':''}<br>Tronçon : ${esc(ILAB[best[8]]||'–')}`;
+  if (!html && show.lux){ let bp = null, bdp = 8*8; for (const p of M.P){ const dx = Tm.X(p[0])-mx, dy = Tm.Y(p[1])-my, d = dx*dx+dy*dy; if (d < bdp){ bdp = d; bp = p; } }
+    if (bp) html = `<b>${fmt(bp[2])} lx</b><br>${hfmt(bp[3])}`; }
+  if (html){ tip.innerHTML = html; tip.hidden = false; const r = cv.getBoundingClientRect(); tip.style.left = Math.min(mx+14, r.width-tip.offsetWidth-6)+'px'; tip.style.top = Math.max(6, my-tip.offsetHeight-10)+'px'; } else tip.hidden = true;
+}
+let drag = null;
+cv.addEventListener('pointerdown', e => { drag = {x:e.clientX, y:e.clientY, dx:view.dx, dy:view.dy}; cv.setPointerCapture(e.pointerId); });
+cv.addEventListener('pointermove', e => { const r = cv.getBoundingClientRect();
+  if (drag){ view.dx = drag.dx + e.clientX - drag.x; view.dy = drag.dy + e.clientY - drag.y; draw(); tip.hidden = true; } else if (Tm) hover(e.clientX-r.left, e.clientY-r.top); });
+cv.addEventListener('pointerup', () => drag = null);
+cv.addEventListener('pointerleave', () => { tip.hidden = true; });
+cv.addEventListener('wheel', e => { e.preventDefault(); const r = cv.getBoundingClientRect(); const mx = e.clientX-r.left - cv.clientWidth/2, my = e.clientY-r.top - cv.clientHeight/2;
+  const f = Math.exp(-e.deltaY*0.0015), k2 = Math.max(1, Math.min(40, view.k*f)), g = k2/view.k;
+  view.dx = mx - (mx - view.dx)*g; view.dy = my - (my - view.dy)*g; view.k = k2; draw(); }, {passive:false});
+for (const k of ['lux','lum']){ const b = document.getElementById('b-'+k); b.onclick = () => { show[k] = !show[k]; b.setAttribute('aria-pressed', show[k]); draw(); }; }
+document.getElementById('b-reset').onclick = () => { view = {k:1,dx:0,dy:0}; draw(); };
+const usedT = [...new Set(M.L.map(q=>q[3]))];
+document.getElementById('legend').innerHTML = `<span>0 lx<span class="ramp" id="ramp"></span>≥ 50 lx</span>` + Object.keys(TCOURT).filter(t=>usedT.includes(t)).map(t => `<span><span class="sw" style="background:${TCOL[t]}"></span>${TCOURT[t]}</span>`).join('') + `<span><span class="sw" style="background:transparent;border:1.5px dashed var(--ink)"></span>Côté non tranché</span>`;
+
+/* ---------- graphiques ---------- */
+const NS = 'http://www.w3.org/2000/svg';
+function el(p, tag, a){ const e = document.createElementNS(NS, tag); for (const k in a) e.setAttribute(k, a[k]); p.appendChild(e); return e; }
+function txt(p, x, y, s, a={}){ const t = el(p, 'text', Object.assign({x, y}, a)); t.textContent = s; return t; }
+const tip2 = document.createElement('div'); tip2.className = 'tip'; tip2.hidden = true;
+function addTip(svg, node, html){ const box = svg.parentNode; box.style.position='relative';
+  node.addEventListener('mousemove', e => { tip2.innerHTML = html; tip2.hidden = false; box.appendChild(tip2); const r = box.getBoundingClientRect(); tip2.style.left = Math.min(e.clientX-r.left+12, r.width-tip2.offsetWidth-4)+'px'; tip2.style.top = (e.clientY-r.top-tip2.offsetHeight-8)+'px'; });
+  node.addEventListener('mouseleave', () => tip2.hidden = true); }
+const niceStep = m => { const raw = m/5, p = Math.pow(10, Math.floor(Math.log10(raw))); for (const s of [1,2,2.5,5,10]) if (s*p >= raw) return s*p; return 10*p; };
+
+function hist(){ const s = document.getElementById('hist'); s.innerHTML=''; const W=560,H=240,m={l:48,r:10,t:14,b:30};
+  const maxC = Math.max(...D.hist.map(h=>h[1])), st = niceStep(maxC), top = Math.ceil(maxC/st)*st;
+  const x = v => m.l + v/100*(W-m.l-m.r), y = c => H-m.b - c/top*(H-m.t-m.b);
+  for (let c=0;c<=top;c+=st){ el(s,'line',{x1:m.l,x2:W-m.r,y1:y(c),y2:y(c),stroke:css('--grid')}); txt(s,m.l-6,y(c)+4,n0(c),{'text-anchor':'end'}); }
+  for (const [e,c] of D.hist){ const r = el(s,'rect',{x:x(e)+1,y:y(c),width:Math.max(1,x(e+2.5)-x(e)-2),height:H-m.b-y(c),fill:css('--s1'),rx:2});
+    addTip(s, r, `<b>${fmt(e)}–${fmt(e+2.5)} lx</b><br>${n0(c)} points (${n0(c*PR.pas_m)} m)`); }
+  for (const v of [0,20,40,60,80,100]) txt(s,x(v),H-m.b+16,v===100?'≥100':v,{'text-anchor':'middle'});
+  txt(s,W-m.r,H-2,'lux',{'text-anchor':'end'});
+  el(s,'line',{x1:x(K.E_med),x2:x(K.E_med),y1:m.t,y2:H-m.b,stroke:css('--ink'),'stroke-dasharray':'3 3'}); txt(s,x(K.E_med)+5,m.t+8,`médiane ${fmt(K.E_med)} lx`,{class:'lbl'});
+}
+function ts(){ const s = document.getElementById('ts'); s.innerHTML=''; const W=560,H=240,m={l:36,r:12,t:14,b:30};
+  const pts = D.ts.filter(p=>p[1]!=null); if (pts.length < 2) return;
+  const t0 = pts[0][0], t1 = pts[pts.length-1][0], maxV = Math.max(20, Math.ceil(Math.max(...pts.map(p=>p[1]))/10)*10);
+  const x = t => m.l + (t-t0)/(t1-t0)*(W-m.l-m.r), y = v => H-m.b - Math.min(v,maxV)/maxV*(H-m.t-m.b);
+  for (let v=0; v<=maxV; v+=10){ el(s,'line',{x1:m.l,x2:W-m.r,y1:y(v),y2:y(v),stroke:css('--grid')}); txt(s,m.l-6,y(v)+4,v,{'text-anchor':'end'}); }
+  for (let hh=Math.ceil(t0); hh<=t1; hh++) txt(s,x(hh),H-m.b+16,(hh%24)+'h',{'text-anchor':'middle'});
+  const ha = PR.heure_abaissement; if (ha > t0 && ha < t1){ el(s,'rect',{x:x(ha),y:m.t,width:x(t1)-x(ha),height:H-m.t-m.b,fill:css('--grid'),opacity:.6}); txt(s,x(ha)+6,m.t+12,'abaissement prévu à 50 %',{class:'lbl'}); }
+  el(s,'path',{d:pts.map((p,i)=>(i?'L':'M')+x(p[0]).toFixed(1)+' '+y(p[1]).toFixed(1)).join(' '),fill:'none',stroke:css('--s1'),'stroke-width':2,'stroke-linejoin':'round'});
+  const cross = el(s,'line',{y1:m.t,y2:H-m.b,stroke:css('--ink-2'),'stroke-width':1,visibility:'hidden'});
+  const dot = el(s,'circle',{r:4,fill:css('--s1'),stroke:css('--panel'),'stroke-width':2,visibility:'hidden'});
+  const hit = el(s,'rect',{x:m.l,y:m.t,width:W-m.l-m.r,height:H-m.t-m.b,fill:'transparent'});
+  const box = s.parentNode; box.style.position='relative';
+  hit.addEventListener('mousemove', e => { const r = s.getBoundingClientRect(), sx = (e.clientX-r.left)/r.width*W; const t = t0 + (sx-m.l)/(W-m.l-m.r)*(t1-t0);
+    const p = pts.reduce((a,b)=>Math.abs(b[0]-t)<Math.abs(a[0]-t)?b:a); cross.setAttribute('x1',x(p[0])); cross.setAttribute('x2',x(p[0])); cross.setAttribute('visibility','visible');
+    dot.setAttribute('cx',x(p[0])); dot.setAttribute('cy',y(p[1])); dot.setAttribute('visibility','visible');
+    tip2.innerHTML = `<b>${hfmt(p[0])}</b><br>médiane ${fmt(p[1])} lx`; tip2.hidden=false; box.appendChild(tip2);
+    const br = box.getBoundingClientRect(); tip2.style.left = Math.min(e.clientX-br.left+12, br.width-tip2.offsetWidth-4)+'px'; tip2.style.top = (e.clientY-br.top-tip2.offsetHeight-8)+'px'; });
+  hit.addEventListener('mouseleave', () => { tip2.hidden = true; cross.setAttribute('visibility','hidden'); dot.setAttribute('visibility','hidden'); });
+}
+function setRamp(){ document.getElementById('ramp').style.background = `linear-gradient(90deg,${ramp().join(',')})`; }
+function all(){ setRamp(); draw(); hist(); ts();
+  bars('cotes', [['À gauche', K.n_gauche, css('--s1')], ['À droite', K.n_droite, css('--s2')], ['Non tranché', K.n_non_tranche, css('--ink-2')]]);
+  bars('impl', [['Un seul côté', (TR.gauche||0)+(TR.droite||0), css('--s1')], ['Les deux côtés', TR.deux_cotes||0, css('--s3')], ['Indéterminé', TR.indetermine||0, css('--ink-2')]]); }
+all();
+addEventListener('resize', draw);
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', all);
+new MutationObserver(all).observe(document.documentElement, {attributes:true, attributeFilter:['data-theme']});
+</script>

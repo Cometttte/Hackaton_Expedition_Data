@@ -1,0 +1,5987 @@
+{
+ "meta": {
+  "fichier_tdms": "Ormesson-sur-Marne.tdms",
+  "fichier_xlsx": "inv.xlsx",
+  "onglet": "SUPPORT ECLAIRAGE PUBLIC",
+  "ville": "Ormesson-sur-Marne",
+  "date": "18/03/2025",
+  "date_iso": "2025-03-18",
+  "debut": "20h17",
+  "fin": "23h38",
+  "genere": "26/11/2026 16h46",
+  "params": {
+   "pas_m": 2.0,
+   "vitesse_min": 0.5,
+   "hex_m": 10.0,
+   "gap_passage_s": 20.0,
+   "rayon_support_m": 12.0,
+   "dist_frole_m": 10.0,
+   "seuil_eteint_lx": 5.0,
+   "rayon_rue_m": 30.0,
+   "seuil_emoy_lx": 10.0,
+   "seuil_cct_sodium": 2400.0,
+   "heure_abaissement": 22.0,
+   "decalage_lateral_m": 3.5,
+   "rayon_match_m": 15.0,
+   "recaler_inventaire": true,
+   "ecart_position_min_m": 5.0,
+   "dispersion_pics_max_m": 2.0,
+   "calage_auto": true,
+   "decalage_long_m": 0.0,
+   "latence_s": 0.0,
+   "recalage_est_m": 0.0,
+   "recalage_nord_m": 0.0,
+   "lux_max_plausible": 150.0,
+   "hauteur_capteurs_m": 1.5,
+   "hauteur_feu_min_m": 3.0,
+   "pic_largeur_min_m": -1.0,
+   "pic_duree_min_s": 0.1,
+   "ecart_capteurs_max": 1.0,
+   "ratio_passage_max": 3.0
+  }
+ },
+ "kpi": {
+  "dist_km": 71.8,
+  "duree_h": 3.34,
+  "E_med": 15.8,
+  "E_moy": 19.6,
+  "E_p25": 7.6,
+  "E_p75": 27.1,
+  "part_sup50": 5.8,
+  "n_sup": 1538,
+  "n_frole": 1263,
+  "part_frole": 82.0,
+  "n_suspects": 14,
+  "n_hex": 3070,
+  "n_hex_multi": 1319,
+  "part_hex_conf": 70.0,
+  "cv_multi_med": 12.0,
+  "n_detect": 1229,
+  "taux_detection": 80.0,
+  "n_non_inv": 76,
+  "lux1_gauche": false,
+  "precision_cote": 84.0,
+  "n_incoh_source": 88,
+  "n_cct": 513,
+  "n_pas_incoh": 2,
+  "n_aberrants": 23,
+  "n_rues": 107,
+  "n_rues_conf": 86,
+  "n_pos_corr": 168
+ },
+ "qualite": {
+  "gnss_source": "port C (5 Hz, avec centrale inertielle)",
+  "n_pos": 60167,
+  "q_counts": {
+   "2": 55882,
+   "5": 4278,
+   "1": 7
+  },
+  "hdop_med": 0.5,
+  "nsat_med": 14.0,
+  "decalage_horloge_s": 237.5,
+  "part_negatifs": 0.98,
+  "part_pics": 0.01,
+  "part_incoherents": 0.02,
+  "n_trop_haut": 3,
+  "n_trop_bref": 15,
+  "n_var_arret": 5,
+  "part_aberrants": 1.604,
+  "n_excursions": 1973,
+  "aberrants": [
+   [
+    "23h31:30",
+    433.0,
+    0.52,
+    5.2,
+    0.0,
+    "trop haut"
+   ],
+   [
+    "23h32:13",
+    249.0,
+    0.73,
+    6.0,
+    6.0,
+    "trop haut"
+   ],
+   [
+    "23h32:13",
+    209.0,
+    0.08,
+    0.7,
+    181.0,
+    "trop haut"
+   ],
+   [
+    "22h01:24",
+    46.0,
+    0.64,
+    1.6,
+    7.0,
+    "trop bref"
+   ],
+   [
+    "23h28:36",
+    38.0,
+    0.59,
+    1.5,
+    16.0,
+    "trop bref"
+   ],
+   [
+    "20h43:52",
+    33.0,
+    1.75,
+    1.6,
+    16.0,
+    "trop bref"
+   ],
+   [
+    "23h01:02",
+    32.0,
+    28.3,
+    1.8,
+    8.0,
+    "variation à l'arrêt"
+   ],
+   [
+    "22h30:04",
+    31.0,
+    1.41,
+    0.0,
+    13.0,
+    "variation à l'arrêt"
+   ],
+   [
+    "22h01:24",
+    30.0,
+    0.04,
+    0.1,
+    12.0,
+    "trop bref"
+   ],
+   [
+    "22h16:49",
+    29.0,
+    0.37,
+    1.3,
+    13.0,
+    "trop bref"
+   ],
+   [
+    "22h16:00",
+    28.0,
+    0.15,
+    0.8,
+    10.0,
+    "trop bref"
+   ],
+   [
+    "23h24:04",
+    26.0,
+    0.26,
+    1.8,
+    11.0,
+    "trop bref"
+   ],
+   [
+    "22h11:18",
+    26.0,
+    0.46,
+    0.5,
+    10.0,
+    "trop bref"
+   ],
+   [
+    "23h41:28",
+    26.0,
+    0.53,
+    1.8,
+    7.0,
+    "trop bref"
+   ],
+   [
+    "23h16:10",
+    25.0,
+    5.16,
+    1.2,
+    0.0,
+    "variation à l'arrêt"
+   ],
+   [
+    "21h01:13",
+    25.0,
+    3.82,
+    1.5,
+    9.0,
+    "variation à l'arrêt"
+   ],
+   [
+    "21h44:11",
+    24.0,
+    0.87,
+    0.4,
+    6.0,
+    "trop bref"
+   ],
+   [
+    "20h49:03",
+    24.0,
+    0.11,
+    0.8,
+    5.0,
+    "trop bref"
+   ],
+   [
+    "23h26:22",
+    22.0,
+    0.29,
+    1.2,
+    5.0,
+    "trop bref"
+   ],
+   [
+    "23h16:38",
+    20.0,
+    0.13,
+    0.7,
+    0.0,
+    "trop bref"
+   ],
+   [
+    "23h05:38",
+    19.0,
+    3.46,
+    0.1,
+    3.0,
+    "variation à l'arrêt"
+   ],
+   [
+    "21h31:06",
+    17.0,
+    0.11,
+    1.0,
+    2.0,
+    "trop bref"
+   ],
+   [
+    "23h41:12",
+    17.0,
+    0.54,
+    1.8,
+    0.0,
+    "trop bref"
+   ]
+  ],
+  "part_arret": 18.6,
+  "corr_capteurs": [
+   0.98,
+   0.94,
+   0.98
+  ],
+  "corr_chromametre": 0.93,
+  "capteurs": [
+   {
+    "nom": "Lux1",
+    "offset": 3.77,
+    "position": [
+     0.25,
+     -0.49
+    ]
+   },
+   {
+    "nom": "Lux2",
+    "offset": 8.14,
+    "position": [
+     0.18,
+     0.0
+    ]
+   },
+   {
+    "nom": "Lux3",
+    "offset": 3.71,
+    "position": [
+     0.25,
+     0.49
+    ]
+   }
+  ],
+  "fs": 50.0,
+  "trous_gnss": 0,
+  "duree_h": 3.34
+ },
+ "methodes": {
+  "temps_brut": {
+   "moy": 19.1,
+   "med": 15.3
+  },
+  "temps_filtre": {
+   "moy": 19.1,
+   "med": 15.1
+  },
+  "distance": {
+   "moy": 19.6,
+   "med": 15.8
+  }
+ },
+ "chroma": {
+  "n": 1219,
+  "led_apres_n": 255,
+  "led_apres_sodium": 97.0,
+  "led_avant_n": 257,
+  "led_avant_blanche": 66.0,
+  "sodium_n": 325,
+  "sodium_ok": 95.0
+ },
+ "calage": {
+  "classes": [
+   [
+    3.8,
+    -1.17,
+    0.957,
+    0.874,
+    17846
+   ],
+   [
+    6.7,
+    -1.85,
+    0.942,
+    0.716,
+    32053
+   ],
+   [
+    9.1,
+    -2.87,
+    0.937,
+    0.49,
+    30547
+   ]
+  ],
+  "ok": true,
+  "decalage_m": 0.22,
+  "latence_s": 0.33
+ },
+ "recalage_inventaire": {
+  "n_apparies": 996,
+  "n_fiables": 435,
+  "n_douteux": 168,
+  "n_cote_inverse": 26,
+  "ecart_med": 3.7,
+  "ecart_p90": 11.7,
+  "global_e": 1.69,
+  "global_n": 1.08,
+  "global_norme": 2.0,
+  "seuil": 5.0,
+  "global_applique": true,
+  "global_residuel": 0.54
+ },
+ "inventaire": {
+  "n_lum": 1624,
+  "n_sup": 1538,
+  "fam": [
+   [
+    "LED",
+    723,
+    31.8,
+    46.0
+   ],
+   [
+    "SODIUM HAUTE PRESSION",
+    527,
+    61.5,
+    117.0
+   ],
+   [
+    "COSMOWHITE",
+    294,
+    26.7,
+    91.0
+   ],
+   [
+    "VAPEUR DE MERCURE",
+    37,
+    4.0,
+    109.0
+   ],
+   [
+    "IODURE METALLIQUE",
+    33,
+    2.9,
+    87.0
+   ],
+   [
+    "SODIUM HAUTE PRESSION BLANC",
+    7,
+    1.1,
+    150.0
+   ],
+   [
+    "NON RENSEIGNEE",
+    3,
+    0.0,
+    null
+   ]
+  ],
+  "etat_fam": {
+   "COSMOWHITE": {
+    "BON": 292,
+    "VETUSTE": 1,
+    "MOYEN": 1
+   },
+   "IODURE METALLIQUE": {
+    "BON": 24,
+    "MOYEN": 9
+   },
+   "LED": {
+    "BON": 723
+   },
+   "NON RENSEIGNEE": {
+    "BON": 3
+   },
+   "SODIUM HAUTE PRESSION": {
+    "MOYEN": 261,
+    "BON": 238,
+    "VETUSTE": 28
+   },
+   "SODIUM HAUTE PRESSION BLANC": {
+    "BON": 6,
+    "MOYEN": 1
+   },
+   "VAPEUR DE MERCURE": {
+    "VETUSTE": 19,
+    "MOYEN": 17,
+    "BON": 1
+   }
+  },
+  "etat": {
+   "BON": 1287,
+   "MOYEN": 289,
+   "VETUSTE": 48
+  },
+  "cat": {
+   "CANDELABRE": 1057,
+   "POTEAU": 526,
+   "BORNE BASSE": 16,
+   "Non renseigné": 13,
+   "APPLIQUE": 4,
+   "BORNE": 3,
+   "MAT": 2,
+   "CONSOLE/CONCESSION": 1
+  },
+  "regime": {
+   "Non renseigné": 785,
+   "Variation": 369,
+   "PERMANENT": 366,
+   "ASTRO": 102,
+   "VARIATION + DETECTION": 2
+  },
+  "typelum": {
+   "MOANA LED": 404,
+   "SQUALO 2": 286,
+   "DECOSTREET LB60": 239,
+   "MOANA": 98,
+   "PLURIO O LED": 86,
+   "OREAC 11": 78,
+   "COMETE LV1": 49,
+   "ODELIA 550": 40
+  },
+  "annee": {
+   "2005": 10,
+   "2006": 7,
+   "2008": 31,
+   "2009": 6,
+   "2010": 2,
+   "2011": 9,
+   "2012": 132,
+   "2013": 137,
+   "2014": 43,
+   "2015": 72,
+   "2016": 76,
+   "2017": 1,
+   "2018": 1,
+   "2019": 13,
+   "2020": 1,
+   "2021": 32,
+   "2022": 51,
+   "2023": 160,
+   "2024": 37,
+   "2025": 194,
+   "2026": 133
+  },
+  "annee_na": 476,
+  "puissance_kw": 128.0,
+  "n_modif_apres": 454,
+  "fill": {
+   "REGIME D ALLUMAGE": 839,
+   "FLUX LUMINEUX LM": 347,
+   "TEMPERATURE DE COULEUR K": 534,
+   "DATE POSE LUMINAIRE": 1148,
+   "PUISSANCE NOMINALE SOURCE W": 1586,
+   "HAUTEUR SUPPORT M": 1416
+  },
+  "n_armoires": 27
+ },
+ "abaissement": {
+  "variation": {
+   "n": 51,
+   "ratio_med": 1.12,
+   "avant": 25.3,
+   "apres": 30.1
+  },
+  "autres": {
+   "n": 35,
+   "ratio_med": 1.29,
+   "avant": 23.6,
+   "apres": 26.0
+  }
+ },
+ "hist": [
+  [
+   0.0,
+   3434
+  ],
+  [
+   2.5,
+   2549
+  ],
+  [
+   5.0,
+   2915
+  ],
+  [
+   7.5,
+   2875
+  ],
+  [
+   10.0,
+   2774
+  ],
+  [
+   12.5,
+   2571
+  ],
+  [
+   15.0,
+   2520
+  ],
+  [
+   17.5,
+   2197
+  ],
+  [
+   20.0,
+   1971
+  ],
+  [
+   22.5,
+   1743
+  ],
+  [
+   25.0,
+   1594
+  ],
+  [
+   27.5,
+   1280
+  ],
+  [
+   30.0,
+   1100
+  ],
+  [
+   32.5,
+   1008
+  ],
+  [
+   35.0,
+   822
+  ],
+  [
+   37.5,
+   738
+  ],
+  [
+   40.0,
+   539
+  ],
+  [
+   42.5,
+   477
+  ],
+  [
+   45.0,
+   381
+  ],
+  [
+   47.5,
+   329
+  ],
+  [
+   50.0,
+   302
+  ],
+  [
+   52.5,
+   257
+  ],
+  [
+   55.0,
+   219
+  ],
+  [
+   57.5,
+   197
+  ],
+  [
+   60.0,
+   165
+  ],
+  [
+   62.5,
+   137
+  ],
+  [
+   65.0,
+   117
+  ],
+  [
+   67.5,
+   103
+  ],
+  [
+   70.0,
+   85
+  ],
+  [
+   72.5,
+   74
+  ],
+  [
+   75.0,
+   67
+  ],
+  [
+   77.5,
+   53
+  ],
+  [
+   80.0,
+   54
+  ],
+  [
+   82.5,
+   45
+  ],
+  [
+   85.0,
+   40
+  ],
+  [
+   87.5,
+   35
+  ],
+  [
+   90.0,
+   23
+  ],
+  [
+   92.5,
+   30
+  ],
+  [
+   95.0,
+   18
+  ],
+  [
+   97.5,
+   44
+  ]
+ ],
+ "ts": [
+  [
+   20.3,
+   20.9
+  ],
+  [
+   20.317,
+   18.8
+  ],
+  [
+   20.333,
+   16.7
+  ],
+  [
+   20.35,
+   14.1
+  ],
+  [
+   20.367,
+   16.7
+  ],
+  [
+   20.383,
+   16.7
+  ],
+  [
+   20.4,
+   14.6
+  ],
+  [
+   20.417,
+   14.6
+  ],
+  [
+   20.433,
+   17.0
+  ],
+  [
+   20.45,
+   14.9
+  ],
+  [
+   20.467,
+   14.9
+  ],
+  [
+   20.483,
+   16.7
+  ],
+  [
+   20.5,
+   17.0
+  ],
+  [
+   20.517,
+   16.7
+  ],
+  [
+   20.533,
+   17.3
+  ],
+  [
+   20.55,
+   17.3
+  ],
+  [
+   20.567,
+   16.4
+  ],
+  [
+   20.583,
+   15.4
+  ],
+  [
+   20.6,
+   15.4
+  ],
+  [
+   20.617,
+   15.4
+  ],
+  [
+   20.633,
+   15.4
+  ],
+  [
+   20.667,
+   15.4
+  ],
+  [
+   20.683,
+   15.8
+  ],
+  [
+   20.7,
+   16.3
+  ],
+  [
+   20.717,
+   15.8
+  ],
+  [
+   20.733,
+   15.8
+  ],
+  [
+   20.75,
+   16.3
+  ],
+  [
+   20.767,
+   16.3
+  ],
+  [
+   20.783,
+   16.3
+  ],
+  [
+   20.8,
+   16.3
+  ],
+  [
+   20.817,
+   16.3
+  ],
+  [
+   20.833,
+   14.9
+  ],
+  [
+   20.85,
+   14.9
+  ],
+  [
+   20.867,
+   14.9
+  ],
+  [
+   20.883,
+   15.1
+  ],
+  [
+   20.9,
+   22.9
+  ],
+  [
+   20.917,
+   22.9
+  ],
+  [
+   20.933,
+   23.2
+  ],
+  [
+   20.95,
+   23.2
+  ],
+  [
+   20.967,
+   21.4
+  ],
+  [
+   20.983,
+   19.7
+  ],
+  [
+   21.0,
+   19.7
+  ],
+  [
+   21.017,
+   9.4
+  ],
+  [
+   21.033,
+   6.3
+  ],
+  [
+   21.05,
+   6.3
+  ],
+  [
+   21.067,
+   6.3
+  ],
+  [
+   21.083,
+   5.8
+  ],
+  [
+   21.1,
+   6.3
+  ],
+  [
+   21.117,
+   7.0
+  ],
+  [
+   21.133,
+   17.4
+  ],
+  [
+   21.15,
+   19.5
+  ],
+  [
+   21.167,
+   20.0
+  ],
+  [
+   21.183,
+   20.0
+  ],
+  [
+   21.2,
+   27.2
+  ],
+  [
+   21.217,
+   20.0
+  ],
+  [
+   21.233,
+   19.5
+  ],
+  [
+   21.25,
+   14.8
+  ],
+  [
+   21.267,
+   14.8
+  ],
+  [
+   21.283,
+   14.8
+  ],
+  [
+   21.3,
+   14.8
+  ],
+  [
+   21.317,
+   14.8
+  ],
+  [
+   21.333,
+   15.4
+  ],
+  [
+   21.35,
+   15.4
+  ],
+  [
+   21.367,
+   16.7
+  ],
+  [
+   21.383,
+   16.7
+  ],
+  [
+   21.4,
+   16.7
+  ],
+  [
+   21.417,
+   17.4
+  ],
+  [
+   21.433,
+   16.7
+  ],
+  [
+   21.45,
+   17.7
+  ],
+  [
+   21.467,
+   17.7
+  ],
+  [
+   21.483,
+   17.7
+  ],
+  [
+   21.5,
+   15.0
+  ],
+  [
+   21.517,
+   17.7
+  ],
+  [
+   21.533,
+   19.8
+  ],
+  [
+   21.55,
+   22.9
+  ],
+  [
+   21.567,
+   26.0
+  ],
+  [
+   21.583,
+   26.0
+  ],
+  [
+   21.6,
+   26.0
+  ],
+  [
+   21.617,
+   25.0
+  ],
+  [
+   21.633,
+   22.1
+  ],
+  [
+   21.65,
+   16.5
+  ],
+  [
+   21.667,
+   16.5
+  ],
+  [
+   21.683,
+   25.0
+  ],
+  [
+   21.7,
+   24.3
+  ],
+  [
+   21.717,
+   24.3
+  ],
+  [
+   21.733,
+   24.3
+  ],
+  [
+   21.75,
+   21.4
+  ],
+  [
+   21.767,
+   8.5
+  ],
+  [
+   21.783,
+   1.0
+  ],
+  [
+   21.8,
+   1.0
+  ],
+  [
+   21.817,
+   18.1
+  ],
+  [
+   21.833,
+   18.1
+  ],
+  [
+   21.85,
+   25.9
+  ],
+  [
+   21.867,
+   25.9
+  ],
+  [
+   21.883,
+   25.9
+  ],
+  [
+   21.9,
+   17.3
+  ],
+  [
+   21.917,
+   17.3
+  ],
+  [
+   21.933,
+   16.5
+  ],
+  [
+   21.95,
+   16.5
+  ],
+  [
+   21.967,
+   14.0
+  ],
+  [
+   21.983,
+   14.0
+  ],
+  [
+   22.0,
+   14.0
+  ],
+  [
+   22.017,
+   16.4
+  ],
+  [
+   22.033,
+   16.5
+  ],
+  [
+   22.05,
+   16.5
+  ],
+  [
+   22.067,
+   16.5
+  ],
+  [
+   22.083,
+   16.5
+  ],
+  [
+   22.1,
+   16.5
+  ],
+  [
+   22.117,
+   25.3
+  ],
+  [
+   22.133,
+   26.7
+  ],
+  [
+   22.15,
+   26.7
+  ],
+  [
+   22.167,
+   26.7
+  ],
+  [
+   22.183,
+   24.6
+  ],
+  [
+   22.2,
+   13.3
+  ],
+  [
+   22.217,
+   11.7
+  ],
+  [
+   22.233,
+   11.3
+  ],
+  [
+   22.25,
+   11.3
+  ],
+  [
+   22.267,
+   11.3
+  ],
+  [
+   22.283,
+   12.3
+  ],
+  [
+   22.3,
+   12.3
+  ],
+  [
+   22.317,
+   12.3
+  ],
+  [
+   22.333,
+   12.3
+  ],
+  [
+   22.35,
+   7.6
+  ],
+  [
+   22.367,
+   7.6
+  ],
+  [
+   22.383,
+   11.6
+  ],
+  [
+   22.4,
+   14.9
+  ],
+  [
+   22.417,
+   14.9
+  ],
+  [
+   22.433,
+   14.9
+  ],
+  [
+   22.45,
+   14.9
+  ],
+  [
+   22.467,
+   14.0
+  ],
+  [
+   22.5,
+   14.0
+  ],
+  [
+   22.517,
+   14.0
+  ],
+  [
+   22.533,
+   13.2
+  ],
+  [
+   22.55,
+   14.0
+  ],
+  [
+   22.567,
+   12.9
+  ],
+  [
+   22.583,
+   12.7
+  ],
+  [
+   22.6,
+   12.9
+  ],
+  [
+   22.617,
+   12.7
+  ],
+  [
+   22.633,
+   12.7
+  ],
+  [
+   22.65,
+   15.3
+  ],
+  [
+   22.667,
+   15.3
+  ],
+  [
+   22.683,
+   12.8
+  ],
+  [
+   22.7,
+   12.8
+  ],
+  [
+   22.717,
+   12.8
+  ],
+  [
+   22.733,
+   11.5
+  ],
+  [
+   22.75,
+   12.5
+  ],
+  [
+   22.767,
+   12.5
+  ],
+  [
+   22.783,
+   15.0
+  ],
+  [
+   22.8,
+   15.5
+  ],
+  [
+   22.817,
+   18.6
+  ],
+  [
+   22.833,
+   25.2
+  ],
+  [
+   22.85,
+   25.2
+  ],
+  [
+   22.867,
+   18.6
+  ],
+  [
+   22.883,
+   18.6
+  ],
+  [
+   22.9,
+   13.4
+  ],
+  [
+   22.917,
+   10.9
+  ],
+  [
+   22.933,
+   10.9
+  ],
+  [
+   22.95,
+   7.5
+  ],
+  [
+   22.967,
+   7.5
+  ],
+  [
+   22.983,
+   7.5
+  ],
+  [
+   23.0,
+   8.3
+  ],
+  [
+   23.017,
+   8.3
+  ],
+  [
+   23.033,
+   11.1
+  ],
+  [
+   23.05,
+   11.1
+  ],
+  [
+   23.067,
+   8.7
+  ],
+  [
+   23.083,
+   7.6
+  ],
+  [
+   23.1,
+   8.2
+  ],
+  [
+   23.117,
+   7.6
+  ],
+  [
+   23.133,
+   7.4
+  ],
+  [
+   23.15,
+   7.6
+  ],
+  [
+   23.167,
+   8.2
+  ],
+  [
+   23.183,
+   9.3
+  ],
+  [
+   23.2,
+   19.7
+  ],
+  [
+   23.217,
+   19.7
+  ],
+  [
+   23.233,
+   19.7
+  ],
+  [
+   23.25,
+   11.1
+  ],
+  [
+   23.267,
+   11.1
+  ],
+  [
+   23.283,
+   11.1
+  ],
+  [
+   23.3,
+   15.7
+  ],
+  [
+   23.317,
+   16.3
+  ],
+  [
+   23.333,
+   18.5
+  ],
+  [
+   23.35,
+   24.2
+  ],
+  [
+   23.367,
+   18.5
+  ],
+  [
+   23.383,
+   16.3
+  ],
+  [
+   23.4,
+   9.8
+  ],
+  [
+   23.417,
+   9.8
+  ],
+  [
+   23.433,
+   9.8
+  ],
+  [
+   23.45,
+   15.7
+  ],
+  [
+   23.467,
+   15.7
+  ],
+  [
+   23.483,
+   16.6
+  ],
+  [
+   23.5,
+   18.0
+  ],
+  [
+   23.517,
+   18.0
+  ],
+  [
+   23.533,
+   18.0
+  ],
+  [
+   23.55,
+   18.0
+  ],
+  [
+   23.567,
+   18.0
+  ],
+  [
+   23.583,
+   15.1
+  ],
+  [
+   23.6,
+   4.8
+  ],
+  [
+   23.617,
+   4.7
+  ],
+  [
+   23.633,
+   4.5
+  ]
+ ],
+ "fam": [
+  {
+   "f": "IODURE METALLIQUE",
+   "n": 8,
+   "q": [
+    38.7,
+    48.0,
+    50.3,
+    63.0,
+    79.7
+   ],
+   "P": 138.0
+  },
+  {
+   "f": "SODIUM HAUTE PRESSION BLANC",
+   "n": 7,
+   "q": [
+    28.8,
+    33.4,
+    44.0,
+    65.0,
+    72.0
+   ],
+   "P": 150.0
+  },
+  {
+   "f": "LED",
+   "n": 526,
+   "q": [
+    14.7,
+    23.9,
+    35.3,
+    47.0,
+    64.4
+   ],
+   "P": 53.0
+  },
+  {
+   "f": "COSMOWHITE",
+   "n": 259,
+   "q": [
+    17.1,
+    26.6,
+    32.4,
+    39.1,
+    48.5
+   ],
+   "P": 91.0
+  },
+  {
+   "f": "SODIUM HAUTE PRESSION",
+   "n": 440,
+   "q": [
+    15.2,
+    21.2,
+    27.3,
+    37.8,
+    58.2
+   ],
+   "P": 116.0
+  },
+  {
+   "f": "VAPEUR DE MERCURE",
+   "n": 21,
+   "q": [
+    4.2,
+    5.8,
+    8.1,
+    16.1,
+    32.2
+   ],
+   "P": 124.0
+  }
+ ],
+ "armoires": [],
+ "rues": [
+  [
+   "MARCHE PRUNELLE (Rue)",
+   62,
+   3.6,
+   2.4,
+   0.8,
+   0.22,
+   2,
+   3,
+   1
+  ],
+  [
+   "OREE DES CHAMPS (Square de l')",
+   32,
+   3.6,
+   3.2,
+   0.9,
+   0.24,
+   1,
+   2,
+   0
+  ],
+  [
+   "ELISABETH VIGEE LEBRUN (Avenue)",
+   112,
+   4.3,
+   4.6,
+   0.8,
+   0.17,
+   2,
+   6,
+   1
+  ],
+  [
+   "ORMES (Rue des)",
+   83,
+   5.0,
+   5.0,
+   1.1,
+   0.22,
+   1,
+   5,
+   0
+  ],
+  [
+   "TOURELLES (Avenue des)",
+   87,
+   5.1,
+   4.6,
+   0.8,
+   0.16,
+   1,
+   12,
+   0
+  ],
+  [
+   "FREDERIC MISTRAL (Avenue)",
+   88,
+   5.6,
+   4.7,
+   0.8,
+   0.15,
+   2,
+   4,
+   1
+  ],
+  [
+   "LONGUES RAIES (Allée des)",
+   141,
+   6.2,
+   5.5,
+   0.8,
+   0.13,
+   1,
+   4,
+   0
+  ],
+  [
+   "CHAMP DE L'ALOUETTE (Rue du)",
+   180,
+   6.6,
+   6.0,
+   3.3,
+   0.5,
+   1,
+   6,
+   0
+  ],
+  [
+   "ANDRE DUNOYER DE SEGONZAC (Square)",
+   30,
+   6.8,
+   6.4,
+   1.1,
+   0.16,
+   1,
+   1,
+   0
+  ],
+  [
+   "COLLINE VERTE (Square de la)",
+   45,
+   7.9,
+   5.4,
+   1.1,
+   0.14,
+   1,
+   4,
+   0
+  ],
+  [
+   "GRIMPEREAUX (Sentier des)",
+   149,
+   7.9,
+   7.2,
+   1.3,
+   0.16,
+   4,
+   5,
+   0
+  ],
+  [
+   "QUEUE EN BRIE (Chemin de la)",
+   113,
+   8.0,
+   5.7,
+   1.2,
+   0.15,
+   3,
+   4,
+   0
+  ],
+  [
+   "GOLF (Rue du)",
+   315,
+   8.4,
+   7.1,
+   1.3,
+   0.16,
+   3,
+   12,
+   1
+  ],
+  [
+   "AEROPOSTALE (Allee de )",
+   16,
+   8.9,
+   8.5,
+   6.3,
+   0.71,
+   3,
+   3,
+   0
+  ],
+  [
+   "BOIS (Rue du)",
+   108,
+   8.9,
+   7.8,
+   1.9,
+   0.22,
+   1,
+   6,
+   0
+  ],
+  [
+   "ANDRE MALRAUX (Rue)",
+   228,
+   8.9,
+   7.0,
+   2.3,
+   0.26,
+   3,
+   29,
+   0
+  ],
+  [
+   "ORLY PARC (Impasse d')",
+   114,
+   9.4,
+   7.7,
+   2.7,
+   0.29,
+   4,
+   4,
+   1
+  ],
+  [
+   "SPORTS (Rue des)",
+   92,
+   9.6,
+   8.6,
+   1.4,
+   0.15,
+   1,
+   4,
+   0
+  ],
+  [
+   "BELVEDERE (Chemin du)",
+   182,
+   9.6,
+   5.3,
+   1.9,
+   0.2,
+   5,
+   9,
+   1
+  ],
+  [
+   "JACQUES MINGOTAUD (Rue)",
+   55,
+   9.7,
+   9.2,
+   4.1,
+   0.42,
+   1,
+   6,
+   0
+  ],
+  [
+   "MARYSE BASTIE (Rue)",
+   293,
+   9.9,
+   8.7,
+   1.2,
+   0.12,
+   5,
+   14,
+   1
+  ],
+  [
+   "BESSONS (Rue des)",
+   84,
+   10.3,
+   8.9,
+   4.5,
+   0.44,
+   5,
+   3,
+   0
+  ],
+  [
+   "PERDRIX (Rue des)",
+   246,
+   10.3,
+   9.0,
+   2.0,
+   0.19,
+   2,
+   8,
+   0
+  ],
+  [
+   "PEUTEUIL (rue Henry)",
+   23,
+   10.4,
+   10.1,
+   4.4,
+   0.42,
+   1,
+   4,
+   0
+  ],
+  [
+   "MAURICE AUBERTIN (Rue)",
+   527,
+   10.8,
+   9.6,
+   2.5,
+   0.23,
+   4,
+   13,
+   0
+  ],
+  [
+   "JEAN CHARCOT ( Rue )",
+   78,
+   11.3,
+   8.1,
+   1.6,
+   0.14,
+   1,
+   6,
+   0
+  ],
+  [
+   "PRE CESAR (Allée du)",
+   278,
+   11.5,
+   9.2,
+   1.3,
+   0.12,
+   1,
+   20,
+   1
+  ],
+  [
+   "ALMA ( Passage de l' )",
+   214,
+   11.6,
+   6.2,
+   0.8,
+   0.07,
+   5,
+   7,
+   0
+  ],
+  [
+   "JEANNE (Rue)",
+   591,
+   11.7,
+   6.0,
+   1.7,
+   0.15,
+   6,
+   20,
+   2
+  ],
+  [
+   "POITEVIN ( Passage )",
+   89,
+   11.8,
+   11.1,
+   4.3,
+   0.36,
+   2,
+   4,
+   0
+  ],
+  [
+   "CANTOUX (Rue des)",
+   377,
+   11.9,
+   11.3,
+   3.2,
+   0.27,
+   2,
+   8,
+   0
+  ],
+  [
+   "COMBATTANTS EN A.F.N. (Place)",
+   15,
+   11.9,
+   8.9,
+   5.0,
+   0.42,
+   3,
+   1,
+   0
+  ],
+  [
+   "PARC (Allée du)",
+   242,
+   12.2,
+   9.6,
+   1.2,
+   0.1,
+   1,
+   12,
+   0
+  ],
+  [
+   "GILBERT TOULELLE (Rue)",
+   143,
+   12.2,
+   11.9,
+   2.2,
+   0.18,
+   1,
+   7,
+   0
+  ],
+  [
+   "VOLTAIRE (Rue)",
+   169,
+   12.3,
+   10.6,
+   2.2,
+   0.18,
+   2,
+   10,
+   0
+  ],
+  [
+   "MARECHAL LYAUTEY (Rue du)",
+   108,
+   12.4,
+   11.6,
+   1.6,
+   0.13,
+   2,
+   7,
+   0
+  ],
+  [
+   "CHATELET ( Rue des )",
+   483,
+   12.6,
+   9.2,
+   2.7,
+   0.21,
+   2,
+   16,
+   0
+  ],
+  [
+   "SONNETTES (Chemin des)",
+   215,
+   12.6,
+   11.9,
+   2.4,
+   0.19,
+   2,
+   20,
+   0
+  ],
+  [
+   "BERNARD DE LATTRE DE TASSIGNY ( Place )",
+   81,
+   12.9,
+   14.1,
+   3.3,
+   0.26,
+   1,
+   7,
+   0
+  ],
+  [
+   "ARTHUR DE MONTALEMBERT (Rue)",
+   255,
+   13.0,
+   10.1,
+   2.2,
+   0.17,
+   3,
+   15,
+   0
+  ],
+  [
+   "EUGENE RETHACKER (Rue)",
+   222,
+   13.3,
+   10.7,
+   2.8,
+   0.21,
+   1,
+   14,
+   0
+  ],
+  [
+   "BRETIGNY ( Rue de )",
+   155,
+   13.5,
+   12.0,
+   2.1,
+   0.15,
+   3,
+   9,
+   0
+  ],
+  [
+   "STADE (Rue du)",
+   244,
+   13.9,
+   13.4,
+   4.3,
+   0.31,
+   2,
+   20,
+   0
+  ],
+  [
+   "RAYMOND THERESE (Rue)",
+   96,
+   14.0,
+   10.6,
+   1.9,
+   0.13,
+   1,
+   6,
+   0
+  ],
+  [
+   "PLAINE (Rue de la)",
+   51,
+   14.1,
+   14.3,
+   6.0,
+   0.42,
+   1,
+   3,
+   0
+  ],
+  [
+   "MARECHAL GALLIENI (Rue du)",
+   267,
+   14.4,
+   11.1,
+   3.1,
+   0.22,
+   2,
+   13,
+   0
+  ],
+  [
+   "JULES GUESDE (Rue)",
+   410,
+   14.4,
+   11.2,
+   1.7,
+   0.12,
+   4,
+   23,
+   0
+  ],
+  [
+   "BOILEAU (Rue)",
+   65,
+   14.5,
+   12.9,
+   6.3,
+   0.44,
+   1,
+   4,
+   0
+  ],
+  [
+   "COTEAUX (Rue des)",
+   113,
+   14.6,
+   12.7,
+   5.0,
+   0.35,
+   1,
+   10,
+   0
+  ],
+  [
+   "BIRAGUE (Rue de)",
+   266,
+   14.6,
+   11.9,
+   1.3,
+   0.09,
+   1,
+   16,
+   0
+  ],
+  [
+   "CORNETTE ( Sentier de la )",
+   15,
+   14.6,
+   11.1,
+   1.9,
+   0.13,
+   1,
+   10,
+   0
+  ],
+  [
+   "SEVIGNE (Rue de)",
+   286,
+   14.9,
+   11.8,
+   2.7,
+   0.18,
+   3,
+   16,
+   0
+  ],
+  [
+   "ONZE NOVEMBRE ( Rue du )",
+   141,
+   15.3,
+   13.1,
+   5.4,
+   0.35,
+   2,
+   12,
+   0
+  ],
+  [
+   "FENELON (Rue)",
+   87,
+   15.3,
+   13.3,
+   5.3,
+   0.34,
+   1,
+   6,
+   0
+  ],
+  [
+   "EMMANUEL D'ORMESSON (Rue)",
+   262,
+   16.3,
+   15.7,
+   9.5,
+   0.58,
+   3,
+   23,
+   0
+  ],
+  [
+   "GOURNAY (Sentier de)",
+   12,
+   16.6,
+   18.4,
+   8.8,
+   0.53,
+   2,
+   2,
+   0
+  ],
+  [
+   "DANIELLE CASANOVA (Rue)",
+   553,
+   16.6,
+   14.7,
+   5.5,
+   0.33,
+   6,
+   29,
+   0
+  ],
+  [
+   "GEORGES GUYNEMER (Rue)",
+   434,
+   16.7,
+   13.8,
+   4.1,
+   0.24,
+   3,
+   17,
+   0
+  ],
+  [
+   "FRANCOIS DE PAULE (Rue)",
+   515,
+   16.8,
+   14.4,
+   3.3,
+   0.2,
+   4,
+   15,
+   0
+  ],
+  [
+   "NOISEAU (Rue de)",
+   347,
+   16.8,
+   15.0,
+   2.5,
+   0.15,
+   2,
+   20,
+   0
+  ],
+  [
+   "GABRIELLE DE SANTENY (Rue)",
+   116,
+   16.8,
+   12.3,
+   1.6,
+   0.1,
+   3,
+   7,
+   0
+  ],
+  [
+   "DEVANT DE LA FERME (Sentier)",
+   31,
+   17.1,
+   16.5,
+   2.0,
+   0.12,
+   1,
+   16,
+   0
+  ],
+  [
+   "MARTYRS DE CHATEAUBRIAND (Rue des)",
+   482,
+   17.2,
+   13.3,
+   2.6,
+   0.15,
+   4,
+   21,
+   1
+  ],
+  [
+   "BELLEVUE (Rue)",
+   99,
+   17.3,
+   15.6,
+   6.1,
+   0.35,
+   2,
+   3,
+   0
+  ],
+  [
+   "CHATELETS (Escaliers des)",
+   11,
+   17.3,
+   17.5,
+   13.5,
+   0.78,
+   2,
+   4,
+   0
+  ],
+  [
+   "EPARGNE (Rue de l')",
+   143,
+   17.4,
+   16.2,
+   8.0,
+   0.46,
+   3,
+   6,
+   0
+  ],
+  [
+   "HENRY (Rue)",
+   336,
+   17.4,
+   14.5,
+   3.7,
+   0.21,
+   3,
+   12,
+   0
+  ],
+  [
+   "AGUESSEAU (Rue d')",
+   295,
+   17.5,
+   14.8,
+   1.3,
+   0.08,
+   1,
+   18,
+   0
+  ],
+  [
+   "ALBERT KIENERT (Rue)",
+   389,
+   17.9,
+   17.3,
+   5.5,
+   0.31,
+   2,
+   28,
+   0
+  ],
+  [
+   "PASCAL (Rue)",
+   286,
+   17.9,
+   14.0,
+   4.4,
+   0.25,
+   3,
+   11,
+   0
+  ],
+  [
+   "DIDEROT (rue)",
+   129,
+   18.0,
+   16.2,
+   4.4,
+   0.25,
+   1,
+   8,
+   0
+  ],
+  [
+   "MOQUE BOUTEILLE (Chemin du)",
+   251,
+   18.0,
+   12.1,
+   1.8,
+   0.1,
+   6,
+   9,
+   0
+  ],
+  [
+   "LE PREVOST (Rue)",
+   184,
+   18.2,
+   14.9,
+   3.7,
+   0.2,
+   2,
+   7,
+   0
+  ],
+  [
+   "CONSTANTIN LIMPENS (Rue)",
+   582,
+   18.3,
+   17.4,
+   9.4,
+   0.52,
+   4,
+   36,
+   0
+  ],
+  [
+   "PASTEUR (Rue)",
+   447,
+   18.6,
+   13.6,
+   2.5,
+   0.14,
+   3,
+   16,
+   0
+  ],
+  [
+   "BASSES BERGES (Allée des)",
+   110,
+   18.7,
+   14.1,
+   3.7,
+   0.2,
+   1,
+   6,
+   0
+  ],
+  [
+   "PIERRE CURIE (Rue)",
+   49,
+   20.0,
+   9.7,
+   2.6,
+   0.13,
+   3,
+   3,
+   1
+  ],
+  [
+   "SERGENT RAYMOND ANNE (Rue du)",
+   170,
+   20.2,
+   15.4,
+   4.1,
+   0.21,
+   2,
+   10,
+   0
+  ],
+  [
+   "EDOUARD BRANLY (Rue)",
+   338,
+   20.6,
+   20.1,
+   6.1,
+   0.3,
+   6,
+   13,
+   0
+  ],
+  [
+   "EGLISE (rue de l')",
+   101,
+   20.7,
+   15.6,
+   3.6,
+   0.18,
+   2,
+   4,
+   0
+  ],
+  [
+   "JEAN JAURES (Rue)",
+   340,
+   20.8,
+   17.3,
+   3.1,
+   0.15,
+   3,
+   19,
+   0
+  ],
+  [
+   "SUCY A CHENNEVIERES (Chemin de)",
+   26,
+   21.0,
+   18.0,
+   6.6,
+   0.32,
+   2,
+   1,
+   0
+  ],
+  [
+   "BORDES (Rue des )",
+   11,
+   21.2,
+   18.6,
+   16.1,
+   0.76,
+   1,
+   1,
+   0
+  ],
+  [
+   "COLONEL DRIANT (Rue du)",
+   398,
+   21.4,
+   17.1,
+   2.6,
+   0.12,
+   6,
+   10,
+   0
+  ],
+  [
+   "ANATOLE FRANCE (Rue)",
+   477,
+   21.4,
+   19.0,
+   8.2,
+   0.38,
+   2,
+   19,
+   0
+  ],
+  [
+   "ANTOINE PINAY (Rue)",
+   242,
+   21.7,
+   18.9,
+   3.4,
+   0.16,
+   1,
+   9,
+   0
+  ],
+  [
+   "MAURICE SCHUMANN (Avenue)",
+   580,
+   22.2,
+   20.3,
+   9.1,
+   0.41,
+   4,
+   28,
+   0
+  ],
+  [
+   "CLOS (Rue du)",
+   182,
+   22.6,
+   18.6,
+   6.0,
+   0.26,
+   2,
+   7,
+   0
+  ],
+  [
+   "PINCE VENT (avenue de)",
+   2107,
+   22.7,
+   21.4,
+   9.2,
+   0.41,
+   8,
+   33,
+   0
+  ],
+  [
+   "RACINE (Rue)",
+   129,
+   22.9,
+   16.8,
+   4.8,
+   0.21,
+   1,
+   10,
+   0
+  ],
+  [
+   "ANCIEN MOULIN ( Rue de l' )",
+   187,
+   22.9,
+   17.9,
+   6.1,
+   0.27,
+   3,
+   10,
+   0
+  ],
+  [
+   "CENTRE (Rue du)",
+   1450,
+   23.1,
+   18.0,
+   4.2,
+   0.18,
+   10,
+   60,
+   1
+  ],
+  [
+   "GENERAL MAUNOURY (Rue du)",
+   24,
+   23.2,
+   23.5,
+   12.9,
+   0.55,
+   3,
+   11,
+   0
+  ],
+  [
+   "AMBOILE (Rue d')",
+   877,
+   23.4,
+   18.8,
+   6.5,
+   0.28,
+   8,
+   52,
+   1
+  ],
+  [
+   "ROMY SCHNEIDER (Rue)",
+   203,
+   24.0,
+   22.3,
+   8.5,
+   0.36,
+   5,
+   22,
+   0
+  ],
+  [
+   "GENERAL DE GAULLE (Avenue du)",
+   796,
+   24.2,
+   21.4,
+   7.3,
+   0.3,
+   7,
+   58,
+   0
+  ],
+  [
+   "EUROPE ( Rue de l' )",
+   41,
+   24.3,
+   21.6,
+   17.5,
+   0.72,
+   1,
+   3,
+   0
+  ],
+  [
+   "ALBERT GEORGES (Rue)",
+   34,
+   24.4,
+   21.1,
+   12.1,
+   0.49,
+   1,
+   2,
+   0
+  ],
+  [
+   "ANDRE LE NOTRE (Rue)",
+   447,
+   25.6,
+   21.7,
+   5.5,
+   0.22,
+   6,
+   16,
+   0
+  ],
+  [
+   "BUTTE ( Sentier de la )",
+   22,
+   25.7,
+   29.1,
+   13.5,
+   0.52,
+   3,
+   8,
+   0
+  ],
+  [
+   "SEPTIEME ART (Allée du)",
+   15,
+   26.3,
+   27.2,
+   16.4,
+   0.62,
+   1,
+   2,
+   0
+  ],
+  [
+   "MAIRIE ( Impasse de la )",
+   30,
+   27.0,
+   25.1,
+   17.6,
+   0.65,
+   4,
+   3,
+   0
+  ],
+  [
+   "DOCTEUR ANDRE LIBERT (Rue du)",
+   357,
+   27.0,
+   19.1,
+   2.7,
+   0.1,
+   4,
+   16,
+   0
+  ],
+  [
+   "PROVINS (Route de)",
+   1440,
+   31.0,
+   27.0,
+   8.6,
+   0.28,
+   9,
+   40,
+   0
+  ],
+  [
+   "BELVEDERE (Rue du)",
+   357,
+   31.3,
+   28.0,
+   5.7,
+   0.18,
+   3,
+   12,
+   0
+  ],
+  [
+   "WLADIMIR ORMESSON (Avenue)",
+   1168,
+   33.0,
+   29.9,
+   13.4,
+   0.41,
+   10,
+   34,
+   0
+  ],
+  [
+   "OLIVIER ORMESSON (Avenue d')",
+   2931,
+   37.7,
+   32.9,
+   13.3,
+   0.35,
+   12,
+   61,
+   0
+  ]
+ ],
+ "suspects": [
+  [
+   "OR04067",
+   "AMBOILE (Rue d')",
+   "sodium haute pression",
+   100.0,
+   4.9,
+   6.1,
+   1,
+   true,
+   "OR04"
+  ],
+  [
+   "OR18012",
+   "BELVEDERE (Chemin du)",
+   "led",
+   66.0,
+   4.9,
+   5.7,
+   2,
+   true,
+   "OR18"
+  ],
+  [
+   "OR01137",
+   "CENTRE (Rue du)",
+   "sodium haute pression",
+   100.0,
+   1.8,
+   6.0,
+   1,
+   false,
+   "OR01"
+  ],
+  [
+   "OR11040",
+   "ELISABETH VIGEE LEBRUN (Avenue)",
+   "led",
+   40.0,
+   3.5,
+   4.3,
+   2,
+   false,
+   "OR11"
+  ],
+  [
+   "OR11029",
+   "FREDERIC MISTRAL (Avenue)",
+   "led",
+   40.0,
+   4.3,
+   6.7,
+   1,
+   false,
+   "OR11"
+  ],
+  [
+   "OR18033",
+   "GOLF (Rue du)",
+   "led",
+   61.0,
+   3.1,
+   5.5,
+   2,
+   true,
+   "OR18"
+  ],
+  [
+   "OR01076",
+   "JEANNE (Rue)",
+   "vapeur de mercure",
+   125.0,
+   3.1,
+   2.2,
+   2,
+   true,
+   "OR01"
+  ],
+  [
+   "OR04088",
+   "JEANNE (Rue)",
+   "vapeur de mercure",
+   125.0,
+   3.3,
+   4.0,
+   2,
+   true,
+   "OR04"
+  ],
+  [
+   "OR03002",
+   "MARCHE PRUNELLE (Rue)",
+   "vapeur de mercure",
+   125.0,
+   4.2,
+   5.1,
+   2,
+   true,
+   "OR03"
+  ],
+  [
+   "OR14039",
+   "MARTYRS DE CHATEAUBRIAND (Rue des)",
+   "cosmowhite",
+   90.0,
+   3.0,
+   5.7,
+   1,
+   false,
+   "OR14"
+  ],
+  [
+   "OR25042",
+   "MARYSE BASTIE (Rue)",
+   "cosmowhite",
+   90.0,
+   4.8,
+   8.6,
+   1,
+   false,
+   "OR25"
+  ],
+  [
+   "OR02053",
+   "ORLY PARC (Impasse d')",
+   "led",
+   41.0,
+   4.9,
+   7.1,
+   3,
+   true,
+   "OR02"
+  ],
+  [
+   "OR04137",
+   "PIERRE CURIE (Rue)",
+   "cosmowhite",
+   90.0,
+   4.0,
+   3.2,
+   2,
+   false,
+   "OR04"
+  ],
+  [
+   "OR06031",
+   "PRE CESAR (Allée du)",
+   "sodium haute pression",
+   100.0,
+   4.3,
+   0.8,
+   3,
+   false,
+   "OR06"
+  ]
+ ],
+ "incoherences": [
+  [
+   "OR08123",
+   "ALBERT KIENERT (Rue)",
+   "led",
+   null,
+   "sodium",
+   "OR08"
+  ],
+  [
+   "OR09109",
+   "ALBERT KIENERT (Rue)",
+   "led",
+   null,
+   "sodium",
+   "OR09"
+  ],
+  [
+   "OR09119",
+   "ALBERT KIENERT (Rue)",
+   "led",
+   null,
+   "sodium",
+   "OR09"
+  ],
+  [
+   "OR09120",
+   "ALBERT KIENERT (Rue)",
+   "led",
+   null,
+   "sodium",
+   "OR09"
+  ],
+  [
+   "OR09121",
+   "ALBERT KIENERT (Rue)",
+   "led",
+   null,
+   "sodium",
+   "OR09"
+  ],
+  [
+   "OR11038",
+   "ANDRE DUNOYER DE SEGONZAC (Square)",
+   "led",
+   null,
+   "sodium",
+   "OR11"
+  ],
+  [
+   "OR04045",
+   "ARTHUR DE MONTALEMBERT (Rue)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR04"
+  ],
+  [
+   "OR04046",
+   "ARTHUR DE MONTALEMBERT (Rue)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR04"
+  ],
+  [
+   "OR04059",
+   "ARTHUR DE MONTALEMBERT (Rue)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR04"
+  ],
+  [
+   "OR07019",
+   "BERNARD DE LATTRE DE TASSIGNY ( Place )",
+   "sodium haute pression",
+   2689.0,
+   "blanche",
+   NaN
+  ],
+  [
+   "OR01132",
+   "BRETIGNY ( Rue de )",
+   "led",
+   null,
+   "sodium",
+   "OR01"
+  ],
+  [
+   "OR22202",
+   "CANTOUX (Rue des)",
+   "led",
+   null,
+   "sodium",
+   "OR22"
+  ],
+  [
+   "OR22203",
+   "CANTOUX (Rue des)",
+   "led",
+   null,
+   "sodium",
+   "OR22"
+  ],
+  [
+   "OR22205",
+   "CANTOUX (Rue des)",
+   "led",
+   null,
+   "sodium",
+   "OR22"
+  ],
+  [
+   "OR14065",
+   "CENTRE (Rue du)",
+   "iodure metallique",
+   null,
+   "sodium",
+   "OR14"
+  ],
+  [
+   "OR14066",
+   "CENTRE (Rue du)",
+   "iodure metallique",
+   null,
+   "sodium",
+   "OR14"
+  ],
+  [
+   "OR01032",
+   "CHATELET ( Rue des )",
+   "sodium haute pression",
+   3029.0,
+   "blanche",
+   "OR01"
+  ],
+  [
+   "OR22163",
+   "CLOS (Rue du)",
+   "iodure metallique",
+   null,
+   "sodium",
+   "OR22"
+  ],
+  [
+   "OR22164",
+   "CLOS (Rue du)",
+   "iodure metallique",
+   null,
+   "sodium",
+   "OR22"
+  ],
+  [
+   "OR22165",
+   "CLOS (Rue du)",
+   "iodure metallique",
+   null,
+   "sodium",
+   "OR22"
+  ],
+  [
+   "OR22166",
+   "CLOS (Rue du)",
+   "iodure metallique",
+   null,
+   "sodium",
+   "OR22"
+  ],
+  [
+   "OR22168",
+   "CLOS (Rue du)",
+   "iodure metallique",
+   null,
+   "sodium",
+   "OR22"
+  ],
+  [
+   "OR14078",
+   "CORNETTE ( Sentier de la )",
+   "sodium haute pression",
+   2639.0,
+   "blanche",
+   "OR14"
+  ],
+  [
+   "OR22192",
+   "DANIELLE CASANOVA (Rue)",
+   "led",
+   null,
+   "sodium",
+   "OR22"
+  ],
+  [
+   "OR01055",
+   "EDOUARD BRANLY (Rue)",
+   "led",
+   null,
+   "sodium",
+   "OR01"
+  ],
+  [
+   "OR01058",
+   "EDOUARD BRANLY (Rue)",
+   "led",
+   null,
+   "sodium",
+   "OR01"
+  ],
+  [
+   "OR11040",
+   "ELISABETH VIGEE LEBRUN (Avenue)",
+   "led",
+   null,
+   "sodium",
+   "OR11"
+  ],
+  [
+   "OR11043",
+   "ELISABETH VIGEE LEBRUN (Avenue)",
+   "led",
+   null,
+   "sodium",
+   "OR11"
+  ],
+  [
+   "OR22036",
+   "EPARGNE (Rue de l')",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR22"
+  ],
+  [
+   "OR04081",
+   "EUGENE RETHACKER (Rue)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR09"
+  ],
+  [
+   "OR15096",
+   "FENELON (Rue)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR15"
+  ],
+  [
+   "OR11030",
+   "FREDERIC MISTRAL (Avenue)",
+   "led",
+   null,
+   "sodium",
+   "OR11"
+  ],
+  [
+   "OR11031",
+   "FREDERIC MISTRAL (Avenue)",
+   "led",
+   null,
+   "sodium",
+   "OR11"
+  ],
+  [
+   "OR08190",
+   "GENERAL DE GAULLE (Avenue du)",
+   "led",
+   null,
+   "sodium",
+   "OR08"
+  ],
+  [
+   "OR26033",
+   "GENERAL MAUNOURY (Rue du)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR26"
+  ],
+  [
+   "OR04025",
+   "GEORGES GUYNEMER (Rue)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR04"
+  ],
+  [
+   "OR04031",
+   "GEORGES GUYNEMER (Rue)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR04"
+  ],
+  [
+   "OR04032",
+   "GEORGES GUYNEMER (Rue)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR04"
+  ],
+  [
+   "OR04040",
+   "GEORGES GUYNEMER (Rue)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR04"
+  ],
+  [
+   "OR15040",
+   "HENRY (Rue)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR15"
+  ],
+  [
+   "OR21005",
+   "JACQUES MINGOTAUD (Rue)",
+   "sodium haute pression",
+   3636.0,
+   "blanche",
+   "OR21"
+  ],
+  [
+   "OR14018",
+   "JEAN JAURES (Rue)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR14"
+  ],
+  [
+   "OR14025",
+   "JEAN JAURES (Rue)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR14"
+  ],
+  [
+   "OR14026",
+   "JEAN JAURES (Rue)",
+   "sodium haute pression",
+   2648.0,
+   "blanche",
+   "OR14"
+  ],
+  [
+   "OR04083",
+   "JEANNE (Rue)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR04"
+  ],
+  [
+   "OR04092",
+   "JEANNE (Rue)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR04"
+  ],
+  [
+   "OR04024",
+   "MARECHAL GALLIENI (Rue du)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR04"
+  ],
+  [
+   "OR22147",
+   "MARECHAL LYAUTEY (Rue du)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR22"
+  ],
+  [
+   "OR14041",
+   "MARTYRS DE CHATEAUBRIAND (Rue des)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR14"
+  ],
+  [
+   "OR15033",
+   "MARTYRS DE CHATEAUBRIAND (Rue des)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR15"
+  ],
+  [
+   "OR25042",
+   "MARYSE BASTIE (Rue)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR25"
+  ],
+  [
+   "OR25044",
+   "MARYSE BASTIE (Rue)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR25"
+  ],
+  [
+   "OR13001",
+   "MAURICE SCHUMANN (Avenue)",
+   "led",
+   null,
+   "sodium",
+   "OR13"
+  ],
+  [
+   "OR01014",
+   "MOQUE BOUTEILLE (Chemin du)",
+   "sodium haute pression",
+   2681.0,
+   "blanche",
+   "OR01"
+  ],
+  [
+   "OR01019",
+   "MOQUE BOUTEILLE (Chemin du)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR01"
+  ],
+  [
+   "OR13067",
+   "OLIVIER ORMESSON (Avenue d')",
+   "led",
+   null,
+   "sodium",
+   "OR13"
+  ],
+  [
+   "OR13068",
+   "OLIVIER ORMESSON (Avenue d')",
+   "led",
+   null,
+   "sodium",
+   "OR13"
+  ],
+  [
+   "OR13069",
+   "OLIVIER ORMESSON (Avenue d')",
+   "led",
+   null,
+   "sodium",
+   "OR13"
+  ],
+  [
+   "OR13070",
+   "OLIVIER ORMESSON (Avenue d')",
+   "led",
+   null,
+   "sodium",
+   "OR13"
+  ],
+  [
+   "OR13071",
+   "OLIVIER ORMESSON (Avenue d')",
+   "led",
+   null,
+   "sodium",
+   "OR13"
+  ],
+  [
+   "OR13072",
+   "OLIVIER ORMESSON (Avenue d')",
+   "led",
+   null,
+   "sodium",
+   "OR13"
+  ],
+  [
+   "OR13073",
+   "OLIVIER ORMESSON (Avenue d')",
+   "led",
+   null,
+   "sodium",
+   "OR13"
+  ],
+  [
+   "OR13074",
+   "OLIVIER ORMESSON (Avenue d')",
+   "led",
+   null,
+   "sodium",
+   "OR13"
+  ],
+  [
+   "OR11005",
+   "OREE DES CHAMPS (Square de l')",
+   "led",
+   null,
+   "sodium",
+   "OR11"
+  ],
+  [
+   "OR15076",
+   "PASCAL (Rue)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR15"
+  ],
+  [
+   "OR22124",
+   "PERDRIX (Rue des)",
+   "led",
+   null,
+   "sodium",
+   "OR22"
+  ],
+  [
+   "OR22131",
+   "PERDRIX (Rue des)",
+   "led",
+   null,
+   "sodium",
+   "OR22"
+  ],
+  [
+   "OR34021",
+   "SEPTIEME ART (Allée du)",
+   "led",
+   null,
+   "sodium",
+   "OR34"
+  ],
+  [
+   "OR04098",
+   "SEVIGNE (Rue de)",
+   "sodium haute pression",
+   2755.0,
+   "blanche",
+   "OR09"
+  ],
+  [
+   "OR04106",
+   "SEVIGNE (Rue de)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR09"
+  ],
+  [
+   "OR26019",
+   "SONNETTES (Chemin des)",
+   "sodium haute pression",
+   3375.0,
+   "blanche",
+   "OR26"
+  ],
+  [
+   "OR26020",
+   "SONNETTES (Chemin des)",
+   "sodium haute pression",
+   3375.0,
+   "blanche",
+   "OR26"
+  ],
+  [
+   "OR26021",
+   "SONNETTES (Chemin des)",
+   "sodium haute pression",
+   3392.0,
+   "blanche",
+   "OR26"
+  ],
+  [
+   "OR26022",
+   "SONNETTES (Chemin des)",
+   "sodium haute pression",
+   3206.0,
+   "blanche",
+   "OR26"
+  ],
+  [
+   "OR26024",
+   "SONNETTES (Chemin des)",
+   "sodium haute pression",
+   3330.0,
+   "blanche",
+   "OR26"
+  ],
+  [
+   "OR22138",
+   "SPORTS (Rue des)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR22"
+  ],
+  [
+   "OR11006",
+   "TOURELLES (Avenue des)",
+   "led",
+   null,
+   "sodium",
+   "OR11"
+  ],
+  [
+   "OR11012",
+   "TOURELLES (Avenue des)",
+   "led",
+   null,
+   "sodium",
+   "OR11"
+  ],
+  [
+   "OR11014",
+   "TOURELLES (Avenue des)",
+   "led",
+   null,
+   "sodium",
+   "OR11"
+  ],
+  [
+   "OR04095",
+   "VOLTAIRE (Rue)",
+   "cosmowhite",
+   null,
+   "sodium",
+   "OR04"
+  ],
+  [
+   "OR16058",
+   "WLADIMIR ORMESSON (Avenue)",
+   "led",
+   null,
+   "sodium",
+   "OR16"
+  ],
+  [
+   "OR16059",
+   "WLADIMIR ORMESSON (Avenue)",
+   "led",
+   null,
+   "sodium",
+   "OR16"
+  ],
+  [
+   "OR16060",
+   "WLADIMIR ORMESSON (Avenue)",
+   "led",
+   null,
+   "sodium",
+   "OR16"
+  ],
+  [
+   "OR16061",
+   "WLADIMIR ORMESSON (Avenue)",
+   "led",
+   null,
+   "sodium",
+   "OR16"
+  ],
+  [
+   "OR16062",
+   "WLADIMIR ORMESSON (Avenue)",
+   "led",
+   null,
+   "sodium",
+   "OR16"
+  ],
+  [
+   "OR16063",
+   "WLADIMIR ORMESSON (Avenue)",
+   "led",
+   null,
+   "sodium",
+   "OR16"
+  ],
+  [
+   "OR16064",
+   "WLADIMIR ORMESSON (Avenue)",
+   "led",
+   null,
+   "sodium",
+   "OR16"
+  ],
+  [
+   "OR16065",
+   "WLADIMIR ORMESSON (Avenue)",
+   "led",
+   null,
+   "sodium",
+   "OR16"
+  ]
+ ],
+ "positions": [
+  [
+   "OR15059",
+   "GOLF (Rue du)",
+   19.9,
+   -14.4,
+   true,
+   2,
+   0.3,
+   48.7902396,
+   2.5410894,
+   48.7902487,
+   2.5413604,
+   "OR15"
+  ],
+  [
+   "OR02021",
+   "OLIVIER ORMESSON (Avenue d')",
+   16.6,
+   -14.9,
+   false,
+   4,
+   0.9,
+   48.7807513,
+   2.5275525,
+   48.7807618,
+   2.5277776,
+   "OR02"
+  ],
+  [
+   "OR04110",
+   "PASTEUR (Rue)",
+   16.3,
+   -14.3,
+   false,
+   2,
+   0.5,
+   48.7836118,
+   2.5296522,
+   48.7836702,
+   2.5298559,
+   "OR04"
+  ],
+  [
+   "OR04112",
+   "PASTEUR (Rue)",
+   16.2,
+   14.3,
+   false,
+   3,
+   0.3,
+   48.7838248,
+   2.5304925,
+   48.7838795,
+   2.5306973,
+   "OR04"
+  ],
+  [
+   "OR04111",
+   "PASTEUR (Rue)",
+   15.9,
+   -14.0,
+   false,
+   2,
+   0.2,
+   48.7836948,
+   2.5299767,
+   48.7837357,
+   2.5301847,
+   "OR04"
+  ],
+  [
+   "OR01044",
+   "CHATELET ( Rue des )",
+   15.7,
+   13.7,
+   false,
+   2,
+   0.4,
+   48.7837121,
+   2.5183802,
+   48.7838154,
+   2.5185254,
+   "OR01"
+  ],
+  [
+   "OR04134",
+   "PASTEUR (Rue)",
+   15.3,
+   10.3,
+   true,
+   2,
+   0.2,
+   48.7825456,
+   2.5277885,
+   48.7825925,
+   2.5279839,
+   "OR04"
+  ],
+  [
+   "OR06005",
+   "BASSES BERGES (Allée des)",
+   15.2,
+   -13.2,
+   false,
+   2,
+   0.9,
+   48.7802644,
+   2.5300373,
+   48.7803344,
+   2.5302154,
+   "OR06"
+  ],
+  [
+   "OR07004",
+   "AMBOILE (Rue d')",
+   14.8,
+   2.2,
+   true,
+   2,
+   0.5,
+   48.7819139,
+   2.5332204,
+   48.7819856,
+   2.5333895,
+   "OR07"
+  ],
+  [
+   "OR14087",
+   "BELVEDERE (Rue du)",
+   14.3,
+   12.8,
+   false,
+   2,
+   0.2,
+   48.7916079,
+   2.5360568,
+   48.791592,
+   2.5362497,
+   "OR14"
+  ],
+  [
+   "OR02014",
+   "OLIVIER ORMESSON (Avenue d')",
+   14.2,
+   -12.5,
+   false,
+   3,
+   0.1,
+   48.7807742,
+   2.524805,
+   48.7807815,
+   2.5249978,
+   "OR02"
+  ],
+  [
+   "OR16001",
+   "OLIVIER ORMESSON (Avenue d')",
+   14.1,
+   -12.1,
+   false,
+   2,
+   0.5,
+   48.7849287,
+   2.5386036,
+   48.7850049,
+   2.5387574,
+   "OR16"
+  ],
+  [
+   "OR18009",
+   "BELVEDERE (Chemin du)",
+   14.1,
+   2.8,
+   true,
+   2,
+   0.8,
+   48.7872815,
+   2.5474824,
+   48.7873576,
+   2.5476353,
+   "OR18"
+  ],
+  [
+   "OR18005",
+   "CHAMP DE L'ALOUETTE (Rue du)",
+   14.0,
+   -12.8,
+   false,
+   2,
+   0.1,
+   48.786155,
+   2.5468875,
+   48.7862798,
+   2.5469138,
+   "OR18"
+  ],
+  [
+   "OR04013",
+   "PASTEUR (Rue)",
+   14.0,
+   12.1,
+   false,
+   2,
+   0.6,
+   48.7831723,
+   2.528389,
+   48.7832616,
+   2.5285235,
+   "OR04"
+  ],
+  [
+   "OR13038",
+   "OLIVIER ORMESSON (Avenue d')",
+   13.9,
+   -11.9,
+   false,
+   2,
+   0.6,
+   48.7836424,
+   2.5355657,
+   48.7837105,
+   2.535724,
+   "OR13"
+  ],
+  [
+   "OR01032",
+   "CHATELET ( Rue des )",
+   13.8,
+   14.6,
+   false,
+   2,
+   0.4,
+   48.7811136,
+   2.5166845,
+   48.7809934,
+   2.5167326,
+   "OR01"
+  ],
+  [
+   "OR08018",
+   "AMBOILE (Rue d')",
+   13.8,
+   -12.4,
+   false,
+   2,
+   1.0,
+   48.7881728,
+   2.5311629,
+   48.7882925,
+   2.5312136,
+   "OR08"
+  ],
+  [
+   "OR07005",
+   "AMBOILE (Rue d')",
+   13.8,
+   1.1,
+   true,
+   2,
+   0.5,
+   48.781742,
+   2.5333275,
+   48.7817974,
+   2.5334954,
+   "OR07"
+  ],
+  [
+   "OR01034",
+   "CHATELET ( Rue des )",
+   13.6,
+   14.2,
+   true,
+   2,
+   0.4,
+   48.7817109,
+   2.5165096,
+   48.7815884,
+   2.5165004,
+   "OR01"
+  ],
+  [
+   "OR04124",
+   "CENTRE (Rue du)",
+   13.4,
+   11.4,
+   false,
+   2,
+   0.3,
+   48.7858785,
+   2.5293704,
+   48.7859531,
+   2.5295137,
+   "OR04"
+  ],
+  [
+   "OR15012",
+   "FRANCOIS DE PAULE (Rue)",
+   13.3,
+   11.3,
+   false,
+   2,
+   0.9,
+   48.7870459,
+   2.5391591,
+   48.7871269,
+   2.5392921,
+   "OR15"
+  ],
+  [
+   "OR15016",
+   "FRANCOIS DE PAULE (Rue)",
+   13.1,
+   10.4,
+   true,
+   4,
+   0.1,
+   48.7878954,
+   2.5396805,
+   48.7878002,
+   2.5397852,
+   "OR15"
+  ],
+  [
+   "OR02012",
+   "OLIVIER ORMESSON (Avenue d')",
+   13.0,
+   -11.3,
+   false,
+   4,
+   0.1,
+   48.7807804,
+   2.5239807,
+   48.7807897,
+   2.5241574,
+   "OR02"
+  ],
+  [
+   "OR04084",
+   "JEANNE (Rue)",
+   12.9,
+   11.2,
+   false,
+   3,
+   0.3,
+   48.7815093,
+   2.5255682,
+   48.7815189,
+   2.5257436,
+   "OR04"
+  ],
+  [
+   "OR15058",
+   "GOLF (Rue du)",
+   12.8,
+   -12.1,
+   false,
+   2,
+   0.3,
+   48.7904487,
+   2.5406853,
+   48.7903911,
+   2.5408367,
+   "OR15"
+  ],
+  [
+   "OR04113",
+   "PASTEUR (Rue)",
+   12.8,
+   10.8,
+   false,
+   3,
+   0.5,
+   48.7839205,
+   2.5308642,
+   48.7839719,
+   2.5310195,
+   "OR04"
+  ],
+  [
+   "OR16002",
+   "OLIVIER ORMESSON (Avenue d')",
+   12.7,
+   -10.7,
+   false,
+   2,
+   1.2,
+   48.7850971,
+   2.5389824,
+   48.7851633,
+   2.5391239,
+   "OR16"
+  ],
+  [
+   "OR22115",
+   "ANATOLE FRANCE (Rue)",
+   12.7,
+   4.8,
+   true,
+   3,
+   0.2,
+   48.7899561,
+   2.5470523,
+   48.7900705,
+   2.5470476,
+   "OR22"
+  ],
+  [
+   "OR13037",
+   "OLIVIER ORMESSON (Avenue d')",
+   12.6,
+   -10.6,
+   false,
+   3,
+   1.2,
+   48.7837821,
+   2.5358921,
+   48.7838431,
+   2.5360368,
+   "OR13"
+  ],
+  [
+   "OR02006",
+   "OLIVIER ORMESSON (Avenue d')",
+   12.6,
+   -10.8,
+   false,
+   5,
+   0.4,
+   48.7807981,
+   2.5218572,
+   48.7808066,
+   2.5220275,
+   "OR02"
+  ],
+  [
+   "OR22108",
+   "ANATOLE FRANCE (Rue)",
+   12.5,
+   10.5,
+   false,
+   3,
+   0.1,
+   48.7900903,
+   2.5471186,
+   48.7901528,
+   2.5472606,
+   "OR22"
+  ],
+  [
+   "OR04123",
+   "CENTRE (Rue du)",
+   12.5,
+   10.5,
+   false,
+   2,
+   0.4,
+   48.785716,
+   2.5290371,
+   48.7857803,
+   2.5291772,
+   "OR04"
+  ],
+  [
+   "OR22066",
+   "DANIELLE CASANOVA (Rue)",
+   12.3,
+   -0.7,
+   true,
+   3,
+   0.1,
+   48.7954091,
+   2.5503211,
+   48.7954829,
+   2.5504466,
+   "OR22"
+  ],
+  [
+   "OR02017",
+   "OLIVIER ORMESSON (Avenue d')",
+   12.3,
+   -10.6,
+   false,
+   4,
+   0.3,
+   48.7807629,
+   2.5260841,
+   48.7807725,
+   2.5262511,
+   "OR02"
+  ],
+  [
+   "OR02015",
+   "OLIVIER ORMESSON (Avenue d')",
+   12.3,
+   -10.5,
+   false,
+   3,
+   0.1,
+   48.7807713,
+   2.5252144,
+   48.7807799,
+   2.5253808,
+   "OR02"
+  ],
+  [
+   "OR02016",
+   "OLIVIER ORMESSON (Avenue d')",
+   12.2,
+   -10.5,
+   false,
+   4,
+   0.8,
+   48.7807504,
+   2.5256204,
+   48.780758,
+   2.5257861,
+   "OR02"
+  ],
+  [
+   "OR02005",
+   "OLIVIER ORMESSON (Avenue d')",
+   12.1,
+   -10.4,
+   false,
+   5,
+   0.4,
+   48.7808015,
+   2.5214337,
+   48.7808104,
+   2.521598,
+   "OR02"
+  ],
+  [
+   "OR18040",
+   "GOLF (Rue du)",
+   12.1,
+   11.8,
+   false,
+   2,
+   0.6,
+   48.7877583,
+   2.5439276,
+   48.7878596,
+   2.5438693,
+   "OR18"
+  ],
+  [
+   "OR02013",
+   "OLIVIER ORMESSON (Avenue d')",
+   12.0,
+   -10.3,
+   false,
+   3,
+   0.2,
+   48.780776,
+   2.5244295,
+   48.7807844,
+   2.5245922,
+   "OR02"
+  ],
+  [
+   "OR22010",
+   "CONSTANTIN LIMPENS (Rue)",
+   11.8,
+   -10.4,
+   false,
+   2,
+   0.4,
+   48.7921747,
+   2.547444,
+   48.7922772,
+   2.5474857,
+   "OR22"
+  ],
+  [
+   "OR14054",
+   "LE PREVOST (Rue)",
+   11.7,
+   11.6,
+   false,
+   2,
+   0.3,
+   48.7907674,
+   2.5389243,
+   48.7908647,
+   2.5388624,
+   "OR14"
+  ],
+  [
+   "OR15042",
+   "HENRY (Rue)",
+   11.7,
+   -11.5,
+   false,
+   2,
+   0.2,
+   48.7889305,
+   2.5387743,
+   48.7890276,
+   2.5387131,
+   "OR15"
+  ],
+  [
+   "OR02011",
+   "OLIVIER ORMESSON (Avenue d')",
+   11.7,
+   -10.0,
+   false,
+   5,
+   0.4,
+   48.7807852,
+   2.5236106,
+   48.7807935,
+   2.5237691,
+   "OR02"
+  ],
+  [
+   "OR27013",
+   "PROVINS (Route de)",
+   11.7,
+   11.1,
+   false,
+   3,
+   0.2,
+   48.7931782,
+   2.5534042,
+   48.7931154,
+   2.5535311,
+   "OR27"
+  ],
+  [
+   "OR08019",
+   "AMBOILE (Rue d')",
+   11.6,
+   -10.0,
+   false,
+   2,
+   0.1,
+   48.7879871,
+   2.5310959,
+   48.7880812,
+   2.5311645,
+   "OR08"
+  ],
+  [
+   "OR04041",
+   "GEORGES GUYNEMER (Rue)",
+   11.5,
+   11.8,
+   false,
+   2,
+   0.1,
+   48.7811362,
+   2.5317155,
+   48.7810466,
+   2.5317946,
+   "OR04"
+  ],
+  [
+   "OR04133",
+   "CENTRE (Rue du)",
+   11.5,
+   9.6,
+   false,
+   2,
+   0.2,
+   48.7846791,
+   2.5277394,
+   48.7847581,
+   2.5278403,
+   "OR04"
+  ],
+  [
+   "OR04109",
+   "PASTEUR (Rue)",
+   11.5,
+   -13.4,
+   false,
+   2,
+   0.4,
+   48.7834844,
+   2.529137,
+   48.7834518,
+   2.5289887,
+   "OR04"
+  ],
+  [
+   "OR13023",
+   "MAURICE SCHUMANN (Avenue)",
+   11.4,
+   13.1,
+   false,
+   2,
+   0.5,
+   48.7784877,
+   2.5344559,
+   48.7783917,
+   2.5343997,
+   "OR13"
+  ],
+  [
+   "OR04136",
+   "PASTEUR (Rue)",
+   11.4,
+   -0.1,
+   true,
+   2,
+   1.1,
+   48.7830196,
+   2.5282229,
+   48.7829777,
+   2.5283644,
+   "OR04"
+  ],
+  [
+   "OR26006",
+   "PROVINS (Route de)",
+   11.4,
+   10.8,
+   false,
+   3,
+   0.7,
+   48.7951393,
+   2.5510518,
+   48.7950794,
+   2.5511771,
+   "OR26"
+  ],
+  [
+   "OR16011",
+   "WLADIMIR ORMESSON (Avenue)",
+   11.1,
+   -9.1,
+   false,
+   4,
+   0.6,
+   48.7863362,
+   2.5418646,
+   48.7863908,
+   2.5419904,
+   "OR16"
+  ],
+  [
+   "OR16021",
+   "WLADIMIR ORMESSON (Avenue)",
+   10.9,
+   -8.9,
+   false,
+   5,
+   1.0,
+   48.7875161,
+   2.5446415,
+   48.787569,
+   2.5447666,
+   "OR16"
+  ],
+  [
+   "OR13022",
+   "MAURICE SCHUMANN (Avenue)",
+   10.8,
+   12.9,
+   false,
+   2,
+   1.0,
+   48.7785881,
+   2.5348426,
+   48.7785323,
+   2.5347215,
+   "OR13"
+  ],
+  [
+   "OR15045",
+   "HENRY (Rue)",
+   10.7,
+   11.2,
+   false,
+   2,
+   0.3,
+   48.7880934,
+   2.5395906,
+   48.7880052,
+   2.5396487,
+   "OR15"
+  ],
+  [
+   "OR04002",
+   "COLONEL DRIANT (Rue du)",
+   10.7,
+   10.1,
+   false,
+   2,
+   0.5,
+   48.7840802,
+   2.5280374,
+   48.7841747,
+   2.5280118,
+   "OR04"
+  ],
+  [
+   "OR13025",
+   "MAURICE SCHUMANN (Avenue)",
+   10.6,
+   -9.6,
+   false,
+   2,
+   1.4,
+   48.7780093,
+   2.5343187,
+   48.7781048,
+   2.5343276,
+   "OR13"
+  ],
+  [
+   "OR14055",
+   "LE PREVOST (Rue)",
+   10.6,
+   10.4,
+   false,
+   2,
+   0.2,
+   48.7905489,
+   2.5391373,
+   48.7906373,
+   2.5390823,
+   "OR14"
+  ],
+  [
+   "OR15034",
+   "MARTYRS DE CHATEAUBRIAND (Rue des)",
+   10.5,
+   -10.3,
+   false,
+   2,
+   0.1,
+   48.7888728,
+   2.5378734,
+   48.7888048,
+   2.5379724,
+   "OR15"
+  ],
+  [
+   "OR06006",
+   "BASSES BERGES (Allée des)",
+   10.3,
+   -8.3,
+   false,
+   2,
+   0.9,
+   48.7803993,
+   2.5303858,
+   48.7804546,
+   2.5304989,
+   "OR06"
+  ],
+  [
+   "OR22012",
+   "CONSTANTIN LIMPENS (Rue)",
+   10.3,
+   -8.9,
+   false,
+   2,
+   0.4,
+   48.792545,
+   2.5475164,
+   48.7926336,
+   2.5475564,
+   "OR22"
+  ],
+  [
+   "OR22087",
+   "STADE (Rue du)",
+   10.3,
+   -8.3,
+   false,
+   2,
+   1.7,
+   48.7899623,
+   2.548823,
+   48.7900112,
+   2.5489418,
+   "OR22"
+  ],
+  [
+   "OR15044",
+   "HENRY (Rue)",
+   10.1,
+   9.9,
+   false,
+   2,
+   0.2,
+   48.7883638,
+   2.5393173,
+   48.7882986,
+   2.5394133,
+   "OR15"
+  ],
+  [
+   "OR16018",
+   "WLADIMIR ORMESSON (Avenue)",
+   10.0,
+   -8.0,
+   false,
+   3,
+   0.5,
+   48.7870899,
+   2.5436304,
+   48.7871381,
+   2.5437456,
+   "OR16"
+  ],
+  [
+   "OR15024",
+   "FRANCOIS DE PAULE (Rue)",
+   9.9,
+   -10.8,
+   false,
+   3,
+   0.2,
+   48.7907148,
+   2.5404939,
+   48.7906272,
+   2.5405185,
+   "OR15"
+  ],
+  [
+   "OR15071",
+   "PASCAL (Rue)",
+   9.9,
+   1.1,
+   true,
+   2,
+   0.6,
+   48.7879948,
+   2.5405414,
+   48.7880004,
+   2.540676,
+   "OR15"
+  ],
+  [
+   "OR04040",
+   "GEORGES GUYNEMER (Rue)",
+   9.7,
+   1.7,
+   true,
+   2,
+   1.0,
+   48.7813635,
+   2.531585,
+   48.7813833,
+   2.531713,
+   "OR04"
+  ],
+  [
+   "OR01036",
+   "CHATELET ( Rue des )",
+   9.7,
+   10.3,
+   false,
+   2,
+   0.6,
+   48.7822371,
+   2.516392,
+   48.782155,
+   2.5164349,
+   "OR01"
+  ],
+  [
+   "OR15013",
+   "MARTYRS DE CHATEAUBRIAND (Rue des)",
+   9.6,
+   9.6,
+   false,
+   2,
+   1.0,
+   48.7872547,
+   2.5394351,
+   48.7873324,
+   2.5393773,
+   "OR15"
+  ],
+  [
+   "OR06032",
+   "PRE CESAR (Allée du)",
+   9.4,
+   9.2,
+   false,
+   2,
+   0.3,
+   48.7797426,
+   2.5304285,
+   48.7796827,
+   2.5305193,
+   "OR06"
+  ],
+  [
+   "OR15060",
+   "PASCAL (Rue)",
+   9.4,
+   8.6,
+   false,
+   2,
+   0.3,
+   48.7871814,
+   2.5395971,
+   48.7871433,
+   2.5397113,
+   "OR15"
+  ],
+  [
+   "OR01035",
+   "CHATELET ( Rue des )",
+   9.3,
+   9.7,
+   true,
+   2,
+   0.4,
+   48.7819738,
+   2.5164518,
+   48.7818914,
+   2.5164319,
+   "OR01"
+  ],
+  [
+   "OR18004",
+   "CHAMP DE L'ALOUETTE (Rue du)",
+   9.2,
+   -7.8,
+   false,
+   2,
+   0.2,
+   48.7864699,
+   2.5468917,
+   48.7865501,
+   2.546919,
+   "OR18"
+  ],
+  [
+   "OR18023",
+   "DOCTEUR ANDRE LIBERT (Rue du)",
+   9.1,
+   8.3,
+   false,
+   3,
+   0.4,
+   48.7902054,
+   2.5419206,
+   48.7901678,
+   2.542031,
+   "OR18"
+  ],
+  [
+   "OR17004",
+   "EGLISE (rue de l')",
+   9.1,
+   -1.5,
+   true,
+   2,
+   0.5,
+   48.7847931,
+   2.5404784,
+   48.784848,
+   2.5405707,
+   "OR17"
+  ],
+  [
+   "OR18027",
+   "LONGUES RAIES (Allée des)",
+   9.1,
+   8.5,
+   false,
+   2,
+   0.6,
+   48.7910375,
+   2.5416955,
+   48.7911182,
+   2.5416769,
+   "OR18"
+  ],
+  [
+   "OR15041",
+   "HENRY (Rue)",
+   9.0,
+   -8.8,
+   false,
+   2,
+   1.1,
+   48.78917,
+   2.538541,
+   48.7892462,
+   2.5384987,
+   "OR15"
+  ],
+  [
+   "OR02020",
+   "OLIVIER ORMESSON (Avenue d')",
+   9.0,
+   10.6,
+   false,
+   4,
+   0.9,
+   48.7807546,
+   2.5271513,
+   48.7807652,
+   2.5270301,
+   "OR02"
+  ],
+  [
+   "OR24007",
+   "PROVINS (Route de)",
+   8.9,
+   -8.1,
+   false,
+   2,
+   0.2,
+   48.7970282,
+   2.5483853,
+   48.7969939,
+   2.5484954,
+   "OR24"
+  ],
+  [
+   "OR22016",
+   "CONSTANTIN LIMPENS (Rue)",
+   8.9,
+   10.1,
+   false,
+   2,
+   0.6,
+   48.7932392,
+   2.5476628,
+   48.7931591,
+   2.5476676,
+   "OR22"
+  ],
+  [
+   "OR04135",
+   "PASTEUR (Rue)",
+   8.9,
+   0.7,
+   true,
+   2,
+   0.0,
+   48.7827721,
+   2.5280052,
+   48.7827497,
+   2.5281214,
+   "OR04"
+  ],
+  [
+   "OR04075",
+   "AMBOILE (Rue d')",
+   8.8,
+   9.1,
+   false,
+   2,
+   0.6,
+   48.7836171,
+   2.5322333,
+   48.7835506,
+   2.5322993,
+   "OR04"
+  ],
+  [
+   "OR01049",
+   "ALMA ( Passage de l' )",
+   8.8,
+   0.1,
+   true,
+   2,
+   0.1,
+   48.7836539,
+   2.5161845,
+   48.7837287,
+   2.5161451,
+   "OR01"
+  ],
+  [
+   "OR15038",
+   "MARTYRS DE CHATEAUBRIAND (Rue des)",
+   8.8,
+   8.6,
+   false,
+   2,
+   0.1,
+   48.7878496,
+   2.5388583,
+   48.7879243,
+   2.5388186,
+   "OR15"
+  ],
+  [
+   "OR13040",
+   "OLIVIER ORMESSON (Avenue d')",
+   8.8,
+   10.8,
+   false,
+   2,
+   0.8,
+   48.7833261,
+   2.5348226,
+   48.7832826,
+   2.5347229,
+   "OR13"
+  ],
+  [
+   "OR22103",
+   "ANATOLE FRANCE (Rue)",
+   8.7,
+   -3.8,
+   true,
+   3,
+   0.2,
+   48.7895052,
+   2.5457669,
+   48.7894417,
+   2.5458371,
+   "OR22"
+  ],
+  [
+   "OR22038",
+   "EPARGNE (Rue de l')",
+   8.7,
+   -7.0,
+   false,
+   3,
+   0.1,
+   48.7939925,
+   2.5485023,
+   48.7939996,
+   2.5486202,
+   "OR22"
+  ],
+  [
+   "OR14056",
+   "LE PREVOST (Rue)",
+   8.7,
+   8.4,
+   false,
+   2,
+   0.3,
+   48.7903416,
+   2.5393527,
+   48.7904154,
+   2.539314,
+   "OR14"
+  ],
+  [
+   "OR01043",
+   "CHATELET ( Rue des )",
+   8.7,
+   5.8,
+   true,
+   2,
+   0.6,
+   48.7835476,
+   2.5181054,
+   48.7836203,
+   2.5181481,
+   "OR01"
+  ],
+  [
+   "OR06034",
+   "PRE CESAR (Allée du)",
+   8.6,
+   -8.6,
+   false,
+   2,
+   0.6,
+   48.7794367,
+   2.5307456,
+   48.7795071,
+   2.5306968,
+   "OR06"
+  ],
+  [
+   "OR16051",
+   "ANTOINE PINAY (Rue)",
+   8.6,
+   -7.5,
+   false,
+   2,
+   0.6,
+   48.787153,
+   2.545221,
+   48.7872297,
+   2.5452324,
+   "OR16"
+  ],
+  [
+   "OR01052",
+   "ALMA ( Passage de l' )",
+   8.5,
+   -10.5,
+   false,
+   2,
+   0.0,
+   48.7843547,
+   2.5176468,
+   48.7843106,
+   2.5175518,
+   "OR01"
+  ],
+  [
+   "OR06023",
+   "PARC (Allée du)",
+   8.5,
+   -10.4,
+   false,
+   2,
+   0.4,
+   48.7799695,
+   2.5310897,
+   48.7799621,
+   2.5309742,
+   "OR06"
+  ],
+  [
+   "OR16022",
+   "WLADIMIR ORMESSON (Avenue)",
+   8.5,
+   -6.5,
+   false,
+   5,
+   0.5,
+   48.7876657,
+   2.5450018,
+   48.7877063,
+   2.5450995,
+   "OR16"
+  ],
+  [
+   "OR22015",
+   "CONSTANTIN LIMPENS (Rue)",
+   8.4,
+   9.6,
+   false,
+   2,
+   0.6,
+   48.7930577,
+   2.54762,
+   48.7929818,
+   2.5476258,
+   "OR22"
+  ],
+  [
+   "OR18041",
+   "GOLF (Rue du)",
+   8.4,
+   8.1,
+   false,
+   2,
+   0.6,
+   48.7875558,
+   2.5441116,
+   48.7876281,
+   2.5440777,
+   "OR18"
+  ],
+  [
+   "OR22019",
+   "CONSTANTIN LIMPENS (Rue)",
+   8.4,
+   9.6,
+   false,
+   2,
+   0.4,
+   48.7937785,
+   2.5477742,
+   48.793703,
+   2.5477793,
+   "OR22"
+  ],
+  [
+   "OR14110",
+   "BELVEDERE (Rue du)",
+   8.4,
+   0.3,
+   true,
+   2,
+   0.3,
+   48.7909221,
+   2.5404592,
+   48.7909905,
+   2.5405062,
+   "OR14"
+  ],
+  [
+   "OR04087",
+   "JEANNE (Rue)",
+   8.3,
+   -9.9,
+   false,
+   3,
+   1.1,
+   48.7814972,
+   2.5266606,
+   48.7815084,
+   2.5265483,
+   "OR04"
+  ],
+  [
+   "OR02019",
+   "OLIVIER ORMESSON (Avenue d')",
+   8.3,
+   9.9,
+   false,
+   4,
+   1.0,
+   48.7807575,
+   2.5267453,
+   48.7807692,
+   2.5266334,
+   "OR02"
+  ],
+  [
+   "OR18008",
+   "BELVEDERE (Chemin du)",
+   8.3,
+   7.4,
+   false,
+   2,
+   0.5,
+   48.7871948,
+   2.5476949,
+   48.7871642,
+   2.5477982,
+   "OR18"
+  ],
+  [
+   "OR06036",
+   "PRE CESAR (Allée du)",
+   8.3,
+   -8.6,
+   false,
+   2,
+   0.6,
+   48.7791987,
+   2.5311387,
+   48.7792605,
+   2.5310751,
+   "OR06"
+  ],
+  [
+   "OR26032",
+   "PROVINS (Route de)",
+   8.3,
+   7.7,
+   false,
+   2,
+   1.3,
+   48.7964424,
+   2.5492186,
+   48.7964018,
+   2.5493134,
+   "OR26"
+  ],
+  [
+   "OR22018",
+   "CONSTANTIN LIMPENS (Rue)",
+   8.3,
+   9.4,
+   false,
+   2,
+   0.4,
+   48.7935983,
+   2.5477441,
+   48.7935241,
+   2.547749,
+   "OR22"
+  ],
+  [
+   "OR01015",
+   "MOQUE BOUTEILLE (Chemin du)",
+   8.2,
+   -6.9,
+   false,
+   2,
+   1.0,
+   48.7813668,
+   2.519087,
+   48.7813525,
+   2.5191971,
+   "OR01"
+  ],
+  [
+   "OR14109",
+   "BELVEDERE (Rue du)",
+   8.2,
+   -0.4,
+   true,
+   2,
+   0.7,
+   48.7909901,
+   2.5400317,
+   48.7910593,
+   2.5400703,
+   "OR14"
+  ],
+  [
+   "OR22009",
+   "CONSTANTIN LIMPENS (Rue)",
+   8.2,
+   -6.7,
+   false,
+   2,
+   0.6,
+   48.7920379,
+   2.5474172,
+   48.7921075,
+   2.5474524,
+   "OR22"
+  ],
+  [
+   "OR06030",
+   "PARC (Allée du)",
+   8.1,
+   -9.2,
+   false,
+   2,
+   0.9,
+   48.7799053,
+   2.5302215,
+   48.7799428,
+   2.5301269,
+   "OR06"
+  ],
+  [
+   "OR06012",
+   "ANDRE LE NOTRE (Rue)",
+   8.1,
+   10.0,
+   false,
+   2,
+   0.1,
+   48.780814,
+   2.5315548,
+   48.7808045,
+   2.5314455,
+   "OR06"
+  ],
+  [
+   "OR22020",
+   "CONSTANTIN LIMPENS (Rue)",
+   8.1,
+   9.2,
+   false,
+   2,
+   0.6,
+   48.7939443,
+   2.5478167,
+   48.7938717,
+   2.5478237,
+   "OR22"
+  ],
+  [
+   "OR22017",
+   "CONSTANTIN LIMPENS (Rue)",
+   8.0,
+   9.2,
+   false,
+   2,
+   0.4,
+   48.7934179,
+   2.5477072,
+   48.7933461,
+   2.5477133,
+   "OR22"
+  ],
+  [
+   "OR22011",
+   "CONSTANTIN LIMPENS (Rue)",
+   7.8,
+   -6.4,
+   false,
+   2,
+   0.4,
+   48.7923888,
+   2.5474842,
+   48.7924554,
+   2.5475191,
+   "OR22"
+  ],
+  [
+   "OR25013",
+   "ANDRE MALRAUX (Rue)",
+   7.8,
+   5.8,
+   false,
+   2,
+   0.3,
+   48.7886116,
+   2.5489382,
+   48.7886541,
+   2.5490232,
+   "OR25"
+  ],
+  [
+   "OR15011",
+   "FRANCOIS DE PAULE (Rue)",
+   7.8,
+   6.3,
+   false,
+   2,
+   0.4,
+   48.7868211,
+   2.5388173,
+   48.7868147,
+   2.5389226,
+   "OR15"
+  ],
+  [
+   "OR16061",
+   "WLADIMIR ORMESSON (Avenue)",
+   7.3,
+   -5.3,
+   false,
+   5,
+   0.8,
+   48.7873965,
+   2.5443367,
+   48.7874184,
+   2.5444297,
+   "OR16"
+  ],
+  [
+   "OR15017",
+   "FRANCOIS DE PAULE (Rue)",
+   7.2,
+   -5.7,
+   false,
+   2,
+   0.3,
+   48.7882279,
+   2.5397736,
+   48.788288,
+   2.5398116,
+   "OR15"
+  ],
+  [
+   "OR02008",
+   "OLIVIER ORMESSON (Avenue d')",
+   7.2,
+   8.8,
+   false,
+   5,
+   1.1,
+   48.7807932,
+   2.5225952,
+   48.7808034,
+   2.5224979,
+   "OR02"
+  ],
+  [
+   "OR04086",
+   "JEANNE (Rue)",
+   7.2,
+   -8.8,
+   false,
+   2,
+   0.4,
+   48.7815036,
+   2.5262576,
+   48.7815146,
+   2.5261613,
+   "OR04"
+  ],
+  [
+   "OR16008",
+   "WLADIMIR ORMESSON (Avenue)",
+   7.2,
+   9.2,
+   false,
+   4,
+   0.6,
+   48.7859788,
+   2.5410523,
+   48.7859437,
+   2.5409703,
+   "OR16"
+  ],
+  [
+   "OR22001",
+   "CONSTANTIN LIMPENS (Rue)",
+   7.1,
+   8.8,
+   false,
+   3,
+   0.0,
+   48.7918965,
+   2.5491786,
+   48.7919037,
+   2.5490821,
+   "OR22"
+  ],
+  [
+   "OR15033",
+   "MARTYRS DE CHATEAUBRIAND (Rue des)",
+   7.1,
+   -7.0,
+   false,
+   2,
+   0.0,
+   48.7891503,
+   2.5375918,
+   48.7891049,
+   2.53766,
+   "OR15"
+  ],
+  [
+   "OR02004",
+   "OLIVIER ORMESSON (Avenue d')",
+   7.1,
+   -5.4,
+   false,
+   5,
+   0.4,
+   48.7808038,
+   2.5210926,
+   48.7808123,
+   2.5211884,
+   "OR02"
+  ],
+  [
+   "OR22116",
+   "PLAINE (Rue de la)",
+   7.1,
+   -1.1,
+   true,
+   2,
+   0.7,
+   48.7912668,
+   2.5490588,
+   48.7912092,
+   2.5490994,
+   "OR22"
+  ],
+  [
+   "OR22014",
+   "CONSTANTIN LIMPENS (Rue)",
+   7.0,
+   8.1,
+   false,
+   2,
+   0.6,
+   48.7928834,
+   2.5475877,
+   48.7928208,
+   2.5475953,
+   "OR22"
+  ],
+  [
+   "OR02002",
+   "OLIVIER ORMESSON (Avenue d')",
+   6.9,
+   8.5,
+   false,
+   7,
+   0.4,
+   48.7808078,
+   2.52042,
+   48.7808186,
+   2.5203269,
+   "OR02"
+  ],
+  [
+   "OR22130",
+   "PERDRIX (Rue des)",
+   6.9,
+   5.4,
+   false,
+   2,
+   0.3,
+   48.7918861,
+   2.5503152,
+   48.7919443,
+   2.5503488,
+   "OR22"
+  ],
+  [
+   "OR27025",
+   "PINCE VENT (avenue de)",
+   6.9,
+   5.2,
+   true,
+   4,
+   0.3,
+   48.7917706,
+   2.5543723,
+   48.7917088,
+   2.5543768,
+   "OR27"
+  ],
+  [
+   "OR13031",
+   "OLIVIER ORMESSON (Avenue d')",
+   6.9,
+   -4.9,
+   false,
+   2,
+   0.8,
+   48.7845344,
+   2.5376684,
+   48.7845704,
+   2.5377443,
+   "OR13"
+  ],
+  [
+   "OR13035",
+   "OLIVIER ORMESSON (Avenue d')",
+   6.9,
+   8.9,
+   false,
+   3,
+   1.2,
+   48.7840254,
+   2.5364756,
+   48.7839863,
+   2.5364034,
+   "OR13"
+  ],
+  [
+   "OR04125",
+   "CENTRE (Rue du)",
+   6.8,
+   4.8,
+   false,
+   2,
+   1.4,
+   48.7860662,
+   2.5297688,
+   48.7861022,
+   2.5298441,
+   "OR04"
+  ],
+  [
+   "OR18051",
+   "ANATOLE FRANCE (Rue)",
+   6.8,
+   5.1,
+   false,
+   3,
+   0.1,
+   48.78928,
+   2.5455894,
+   48.789334,
+   2.5456332,
+   "OR18"
+  ],
+  [
+   "OR22110",
+   "ANATOLE FRANCE (Rue)",
+   6.8,
+   -8.8,
+   false,
+   3,
+   0.1,
+   48.7903162,
+   2.5476327,
+   48.7902841,
+   2.5475538,
+   "OR22"
+  ],
+  [
+   "OR25007",
+   "ANDRE MALRAUX (Rue)",
+   6.8,
+   4.8,
+   false,
+   2,
+   0.3,
+   48.788187,
+   2.547442,
+   48.788229,
+   2.5475091,
+   "OR25"
+  ],
+  [
+   "OR13041",
+   "OLIVIER ORMESSON (Avenue d')",
+   6.8,
+   -4.8,
+   false,
+   2,
+   0.1,
+   48.7831088,
+   2.5343125,
+   48.7831414,
+   2.5343902,
+   "OR13"
+  ],
+  [
+   "OR18003",
+   "CHAMP DE L'ALOUETTE (Rue du)",
+   6.7,
+   -5.4,
+   false,
+   2,
+   0.1,
+   48.7867411,
+   2.5468962,
+   48.7867996,
+   2.5469188,
+   "OR18"
+  ],
+  [
+   "OR26010",
+   "PROVINS (Route de)",
+   6.7,
+   -6.0,
+   false,
+   2,
+   0.0,
+   48.7943325,
+   2.5522235,
+   48.7943038,
+   2.5523037,
+   "OR26"
+  ],
+  [
+   "OR04091",
+   "JEANNE (Rue)",
+   6.7,
+   -8.2,
+   false,
+   2,
+   0.4,
+   48.7814881,
+   2.5281559,
+   48.7814995,
+   2.5280669,
+   "OR04"
+  ],
+  [
+   "OR08020",
+   "AMBOILE (Rue d')",
+   6.6,
+   -5.0,
+   false,
+   2,
+   0.3,
+   48.7877862,
+   2.5310237,
+   48.7878391,
+   2.5310652,
+   "OR08"
+  ],
+  [
+   "OR06035",
+   "PRE CESAR (Allée du)",
+   6.5,
+   -6.7,
+   false,
+   2,
+   0.6,
+   48.7793188,
+   2.5309389,
+   48.7793691,
+   2.5308945,
+   "OR06"
+  ],
+  [
+   "OR02035",
+   "MAURICE AUBERTIN (Rue)",
+   6.5,
+   4.6,
+   false,
+   4,
+   0.2,
+   48.7793559,
+   2.5240451,
+   48.7793724,
+   2.5241297,
+   "OR02"
+  ],
+  [
+   "OR06007",
+   "BASSES BERGES (Allée des)",
+   6.4,
+   -4.4,
+   false,
+   2,
+   0.7,
+   48.7805621,
+   2.5307255,
+   48.7805992,
+   2.5307924,
+   "OR06"
+  ],
+  [
+   "OR04042",
+   "ANDRE LE NOTRE (Rue)",
+   6.4,
+   4.4,
+   false,
+   2,
+   0.6,
+   48.7810366,
+   2.5319926,
+   48.7810603,
+   2.5320721,
+   "OR04"
+  ],
+  [
+   "OR16055",
+   "ANTOINE PINAY (Rue)",
+   6.4,
+   -4.8,
+   false,
+   2,
+   1.2,
+   48.786286,
+   2.5457879,
+   48.7863389,
+   2.5458213,
+   "OR16"
+  ],
+  [
+   "OR04007",
+   "COLONEL DRIANT (Rue du)",
+   6.4,
+   5.6,
+   false,
+   3,
+   0.7,
+   48.7823751,
+   2.5290274,
+   48.7824323,
+   2.5290237,
+   "OR04"
+  ],
+  [
+   "OR15014",
+   "FRANCOIS DE PAULE (Rue)",
+   6.3,
+   -4.7,
+   false,
+   4,
+   0.1,
+   48.7874782,
+   2.5395677,
+   48.7875298,
+   2.5396026,
+   "OR15"
+  ],
+  [
+   "OR15018",
+   "FRANCOIS DE PAULE (Rue)",
+   6.3,
+   -4.7,
+   false,
+   2,
+   0.3,
+   48.7885185,
+   2.5398573,
+   48.7885701,
+   2.5398918,
+   "OR15"
+  ],
+  [
+   "OR25012",
+   "ANDRE MALRAUX (Rue)",
+   6.2,
+   4.2,
+   false,
+   2,
+   1.1,
+   48.7885087,
+   2.5486721,
+   48.7885337,
+   2.5487469,
+   "OR25"
+  ],
+  [
+   "OR22117",
+   "PLAINE (Rue de la)",
+   6.1,
+   -0.5,
+   true,
+   2,
+   0.6,
+   48.7912611,
+   2.5487034,
+   48.7912076,
+   2.5487202,
+   "OR22"
+  ],
+  [
+   "OR15040",
+   "HENRY (Rue)",
+   6.1,
+   -5.6,
+   false,
+   2,
+   0.0,
+   48.7894644,
+   2.538263,
+   48.7895182,
+   2.5382498,
+   "OR15"
+  ],
+  [
+   "OR06013",
+   "PARC (Allée du)",
+   5.9,
+   -4.0,
+   false,
+   2,
+   1.9,
+   48.7801471,
+   2.5298774,
+   48.7801889,
+   2.5299265,
+   "OR06"
+  ],
+  [
+   "OR08006",
+   "AMBOILE (Rue d')",
+   5.9,
+   -4.3,
+   false,
+   2,
+   1.0,
+   48.7908652,
+   2.53214,
+   48.7909123,
+   2.5321763,
+   "OR08"
+  ],
+  [
+   "OR13048",
+   "OLIVIER ORMESSON (Avenue d')",
+   5.7,
+   7.7,
+   false,
+   5,
+   0.5,
+   48.7822635,
+   2.5322943,
+   48.7822354,
+   2.5322294,
+   "OR13"
+  ],
+  [
+   "OR02010",
+   "OLIVIER ORMESSON (Avenue d')",
+   5.7,
+   -3.9,
+   false,
+   5,
+   0.2,
+   48.7807877,
+   2.523264,
+   48.7807971,
+   2.5233402,
+   "OR02"
+  ],
+  [
+   "OR16010",
+   "WLADIMIR ORMESSON (Avenue)",
+   5.7,
+   -3.7,
+   false,
+   4,
+   0.5,
+   48.7862137,
+   2.5415854,
+   48.7862412,
+   2.5416504,
+   "OR16"
+  ],
+  [
+   "OR14064",
+   "CENTRE (Rue du)",
+   5.7,
+   3.7,
+   false,
+   2,
+   0.1,
+   48.7894908,
+   2.5378478,
+   48.78952,
+   2.5379109,
+   "OR14"
+  ],
+  [
+   "OR04083",
+   "JEANNE (Rue)",
+   5.7,
+   -7.2,
+   false,
+   2,
+   1.4,
+   48.7815132,
+   2.5251638,
+   48.7815227,
+   2.5250883,
+   "OR04"
+  ],
+  [
+   "OR16052",
+   "ANTOINE PINAY (Rue)",
+   5.5,
+   4.6,
+   false,
+   2,
+   0.0,
+   48.7870835,
+   2.5455445,
+   48.7870653,
+   2.5456135,
+   "OR16"
+  ],
+  [
+   "OR17001",
+   "EGLISE (rue de l')",
+   5.4,
+   5.0,
+   false,
+   2,
+   0.4,
+   48.7853413,
+   2.5399487,
+   48.7853139,
+   2.5400092,
+   "OR17"
+  ],
+  [
+   "OR09061",
+   "NOISEAU (Rue de)",
+   5.4,
+   -4.8,
+   false,
+   2,
+   0.4,
+   48.7844435,
+   2.5369017,
+   48.78442,
+   2.5369658,
+   "OR09"
+  ],
+  [
+   "OR13053",
+   "OLIVIER ORMESSON (Avenue d')",
+   5.4,
+   -3.4,
+   false,
+   7,
+   0.6,
+   48.7814526,
+   2.5304192,
+   48.7814788,
+   2.5304807,
+   "OR13"
+  ],
+  [
+   "OR16014",
+   "WLADIMIR ORMESSON (Avenue)",
+   5.4,
+   7.4,
+   false,
+   4,
+   0.9,
+   48.786566,
+   2.542403,
+   48.7865403,
+   2.5423412,
+   "OR16"
+  ],
+  [
+   "OR04077",
+   "AMBOILE (Rue d')",
+   5.2,
+   5.3,
+   false,
+   2,
+   0.4,
+   48.7832577,
+   2.5324407,
+   48.7832235,
+   2.5324898,
+   "OR04"
+  ],
+  [
+   "OR22008",
+   "CONSTANTIN LIMPENS (Rue)",
+   5.2,
+   3.8,
+   false,
+   2,
+   0.2,
+   48.7919145,
+   2.5473914,
+   48.7919108,
+   2.5474623,
+   "OR22"
+  ],
+  [
+   "OR16054",
+   "ANTOINE PINAY (Rue)",
+   5.2,
+   -0.5,
+   true,
+   2,
+   0.0,
+   48.7865856,
+   2.5458166,
+   48.7866098,
+   2.5457565,
+   "OR16"
+  ],
+  [
+   "OR27027",
+   "PINCE VENT (avenue de)",
+   5.1,
+   -3.1,
+   false,
+   6,
+   0.3,
+   48.791541,
+   2.5538384,
+   48.7915661,
+   2.5538973,
+   "OR27"
+  ],
+  [
+   "OR27016",
+   "PROVINS (Route de)",
+   5.1,
+   -5.1,
+   false,
+   4,
+   0.5,
+   48.7936249,
+   2.5532186,
+   48.7936677,
+   2.5531941,
+   "OR27"
+  ],
+  [
+   "OR25033",
+   "MARYSE BASTIE (Rue)",
+   5.0,
+   -3.0,
+   false,
+   2,
+   0.3,
+   48.7892484,
+   2.5496958,
+   48.7892765,
+   2.549749,
+   "OR25"
+  ]
+ ],
+ "temps": {
+  "lecture_tdms": 1.13,
+  "gnss": 0.3,
+  "interpolation": 0.06,
+  "filtrage": 1.67,
+  "calage": 0.52,
+  "spatialisation": 0.1,
+  "qualite": 0.03,
+  "hexagones": 0.03,
+  "inventaire": 0.86,
+  "supports": 0.14,
+  "detection": 4.48,
+  "chromametre": 0.08,
+  "rues": 0.04,
+  "abaissement": 0.01,
+  "exports": 0.56,
+  "total": 10.5
+ }
+}
