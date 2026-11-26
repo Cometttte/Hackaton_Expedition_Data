@@ -2,9 +2,11 @@
 
 Trois lectures des mesures (cf. cahier des charges GETYS) :
   * Moyenne au tronçon : filaire OSM, une moyenne par sens de circulation puis moyenne des deux sens
-  * Hexagones de 10 m  : statistiques par cellule, multi-passages
-  * Densité de lux     : carte de chaleur des points
+  * Hexagones de 10 m  : statistiques par cellule, multi-passages, même règle par sens
+  * Points chauds / froids : valeur moyenne autour de chaque point (méthode de carte.html, getys_rapport.py),
+    rayon fixe en mètres quel que soit le zoom
 La conformité suit un SDAL : un seuil d'éclairement moyen par type de voie.
+Chaque vue peut être affichée avant ou après le lissage du bruit (colonne E_brut de mesures_pas2m.csv).
 """
 import base64
 import json
@@ -20,7 +22,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.io as pio
 import requests
-from dash import ALL, Input, Output, Patch, State, ctx, dash_table, dcc, html
+from dash import ALL, ClientsideFunction, Input, Output, Patch, State, ctx, dash_table, dcc, html  # noqa: F401
 from flask import abort, send_from_directory
 from pyproj import Transformer
 from scipy.spatial import cKDTree
@@ -33,16 +35,33 @@ ICI = Path(__file__).resolve().parent
 RACINE = ICI.parent                           # racine du dépôt (getys_rapport.py, rapports/)
 SERVER_URL = os.environ.get("SERVER_URL", "http://localhost:5001/upload")   # serveur d'analyse (serveur.py)
 RAPPORTS_DIR = Path(os.environ.get("RAPPORTS_DIR", RACINE / "rapports"))     # sorties de getys_rapport.py
-MAP_STYLE = "carto-darkmatter"                # fond de carte gratuit, sans clé
-ECHELLE = "Inferno"                           # palette des lux
-VERT, ROUGE, AMBRE, CYAN = "#3ddc84", "#ff5c5c", "#f5b301", "#38d9f5"
+FONDS = {"sombre": "carto-darkmatter", "clair": "carto-positron"}           # fonds de carte gratuits, sans clé
+VERT, ROUGE, ORANGE, AMBRE, CYAN = "#2fbf71", "#e5484d", "#ff9f43", "#f5b301", "#38d9f5"
 CARTE_H = 640
-# couleurs des types de lampe estimés par l'analyse (chromamètre)
-COUL_TYPES = {"sodium": "#ff9d2e", "blanc_2700": "#ffd27a", "led_3000": "#fff3c4", "blanc_neutre": "#d9f2ff",
-              "blanc_froid": "#8fd3ff", "inconnu": "#8b949e"}
-# classes d'éclairement pour colorer les tronçons (lx)
+ZOOM0 = 13.6
+LUX_MAX = 50                                  # haut de l'échelle des lux (comme carte.html)
+
+# Palette froid -> chaud de carte.html (getys_rapport.py), de 0 à 50 lx
+STOPS = [(0, (15, 59, 76)), (5, (30, 95, 105)), (10, (52, 135, 120)), (15, (140, 200, 160)),
+         (22, (232, 236, 160)), (30, (247, 214, 120)), (40, (246, 170, 95)), (50, (238, 120, 70))]
+ECHELLE = [[v / LUX_MAX, f"rgb{c}"] for v, c in STOPS]
+
+
+def couleur_lux(v):
+    """Même interpolation que rgb() dans carte_template.html."""
+    v = max(0.0, min(LUX_MAX, float(v)))
+    for (a, ca), (b, cb) in zip(STOPS[:-1], STOPS[1:]):
+        if v <= b:
+            t = (v - a) / (b - a)
+            return "rgb({},{},{})".format(*(round(x + (y - x) * t) for x, y in zip(ca, cb)))
+    return "rgb{}".format(STOPS[-1][1])
+
+
+# classes d'éclairement pour colorer les tronçons (lx) : couleur au milieu de chaque classe
 PALIERS = [0, 2, 5, 7.5, 10, 15, 20, 30, math.inf]
-COUL_PALIERS = ["#5a6bff", "#8a4dff", "#b543d6", "#d94a9c", "#ef6467", "#f8893f", "#fcb22a", "#f9e24c"]   # visible sur fond sombre
+COUL_PALIERS = [couleur_lux(m) for m in (1, 3.5, 6.25, 8.75, 12.5, 17.5, 25, 40)]
+COUL_TYPES = {"sodium": "#ff8a2a", "blanc_2700": "#ffd23f", "led_3000": "#3b9bff", "blanc_neutre": "#2ad4b0",
+              "blanc_froid": "#b18cff", "inconnu": "#a0a8b5"}          # couleurs de carte.html
 
 TO93 = Transformer.from_crs(4326, 2154, always_xy=True)
 TO84 = Transformer.from_crs(2154, 4326, always_xy=True)
@@ -57,6 +76,8 @@ pio.templates["clair"].layout.update(
     hoverlabel=dict(bgcolor="#161b22", bordercolor="#30363d", font_color="#e6edf3"),
 )
 pio.templates.default = "clair"
+BARRE_COULEUR = dict(thickness=12, x=0.99, xanchor="right", len=0.55, bgcolor="rgba(13,17,23,0.75)",
+                     tickfont=dict(color="#e6edf3"), title_font=dict(color="#e6edf3"))
 
 app = dash.Dash(__name__, title="Éclairage public", suppress_callback_exceptions=True,
                 external_stylesheets=[dbc.themes.DARKLY, dbc.icons.BOOTSTRAP,
@@ -65,7 +86,7 @@ app = dash.Dash(__name__, title="Éclairage public", suppress_callback_exception
 
 @app.server.route("/rapport/<path:chemin>")
 def servir_rapport(chemin):
-    """Sert le rapport HTML complet produit par getys_rapport.py."""
+    """Sert rapport.html / carte.html produits par getys_rapport.py."""
     racine = RAPPORTS_DIR.resolve()
     if not (racine / chemin).is_file():
         abort(404)
@@ -83,7 +104,6 @@ def lister_rapports():
 
 
 def en_bool(v):
-    """Conformité : accepte True/False, 1/0, 'oui', 'conforme'..."""
     return str(v).strip().lower() in ("true", "1", "oui", "conforme", "ok")
 
 
@@ -95,20 +115,24 @@ def lire_csv(chemin):
     return df
 
 
-def charger(dossier):
+def charger(dossier, brut=False):
+    """Données d'un rapport. brut=True : mêmes calculs sur le signal avant lissage du bruit."""
     d = Path(dossier)
-    return _charger(str(d), d.stat().st_mtime)     # le mtime invalide le cache si le rapport change
+    base = _charger(str(d), d.stat().st_mtime)     # le mtime invalide le cache si le rapport change
+    if not brut or base["mesures"] is None or "lux_brut" not in base["mesures"]:
+        return base
+    return _charger_brut(str(d), d.stat().st_mtime)
 
 
 @lru_cache(maxsize=4)
 def _charger(dossier, _mtime):
     d = Path(dossier)
     sortie = {"resume": {}, "hex": None, "mesures": None, "supports": None, "luminaires": None,
-              "troncons": None, "geoms": None, "erreur_troncons": None, "arbre_pts": None}
+              "troncons": None, "geoms": None, "erreur_troncons": None, "arbre_pts": None, "brut": False}
     if (d / "resume.json").exists():
         sortie["resume"] = json.loads((d / "resume.json").read_text(encoding="utf-8"))
     if (d / "mesures_pas2m.csv").exists():
-        m = lire_csv(d / "mesures_pas2m.csv").rename(columns={"E": "lux"})   # GETYS : éclairement "E"
+        m = lire_csv(d / "mesures_pas2m.csv").rename(columns={"E": "lux", "E_brut": "lux_brut"})
         if "x" not in m:
             m["x"], m["y"] = TO93.transform(m["lon"].to_numpy(), m["lat"].to_numpy())
         m["lux_lisse"] = m["lux"].rolling(5, center=True, min_periods=1).mean()   # évite un point isolé
@@ -147,6 +171,23 @@ def _charger(dossier, _mtime):
                              "lat": f["geometry"]["coordinates"][1]}
                             for f in gj["features"] if f.get("geometry")])
         sortie["luminaires"] = lum if not lum.empty else None
+    return sortie
+
+
+@lru_cache(maxsize=2)
+def _charger_brut(dossier, mtime):
+    """Variante « avant lissage » : tronçons et hexagones recalculés sur E_brut (même filaire)."""
+    base = _charger(dossier, mtime)
+    m = base["mesures"].assign(lux=base["mesures"]["lux_brut"])
+    sortie = {**base, "mesures": m, "brut": True}
+    if base["troncons"] is not None:
+        tr, geoms, _ = T.calculer(m, T.charger_voirie(m["lat"], m["lon"]))
+        cl = base["troncons"].set_index("id")["classe"]
+        sortie["troncons"], sortie["geoms"] = tr, geoms
+        sortie["troncons"]["classe"] = tr["id"].map(cl).fillna(tr["classe"])
+    gj, props = H.calculer(m)
+    props["classe"] = classe_des_points(base, props["_lon"], props["_lat"])
+    sortie["hex"] = (gj, props)
     return sortie
 
 
@@ -226,6 +267,13 @@ def cap_proche(data, lat, lon):
     return float(data["mesures"].iloc[i].get("cap", 0) or 0)
 
 
+def taille_points(zoom, lat=48.8):
+    """Diamètre (px) d'un point chaud/froid : rayon de 9 m à l'écran, borné à 3-40 px (comme carte.html).
+    MapLibre : tuiles de 512 px -> mètres par pixel = 40 075 017 · cos(lat) / 2^(zoom + 9)."""
+    mpp = 40075016.686 * math.cos(math.radians(lat)) / 2 ** ((zoom or ZOOM0) + 9)
+    return 2 * max(3.0, min(40.0, 9.0 / mpp))
+
+
 # ------------------------------------------------------------------ COMPOSANTS
 def kpi(icone, titre, valeur, detail=None, couleur="light", barre=None):
     corps = [
@@ -255,7 +303,7 @@ def _traces_troncons(data, tr, couleur):
     if couleur == "conformite":
         groupes = [("Conforme", VERT, tr["conforme"]),
                    ("Non conforme", ROUGE, ~tr["conforme"] & ~tr["a_completer"]),
-                   ("Non conforme · 1 seul sens mesuré", "#ff9f43", ~tr["conforme"] & tr["a_completer"])]
+                   ("Non conforme · 1 seul sens mesuré", ORANGE, ~tr["conforme"] & tr["a_completer"])]
     else:
         e = tr["E_moy"]
         groupes = [(f"{PALIERS[i]:g}–{PALIERS[i + 1]:g} lx" if PALIERS[i + 1] < math.inf else f"> {PALIERS[i]:g} lx",
@@ -286,15 +334,36 @@ def _traces_troncons(data, tr, couleur):
     return traces
 
 
-def carte(data, mode, couleur, couches, sdal, selection):
+def _trace_points(m, sens, zoom):
+    """Points chauds / froids (carte.html) : couleur = valeur, rayon fixe en mètres, les plus chauds dessus."""
+    if sens in ("1", "2") and "sens" in m:
+        m = m[m["sens"] == int(sens)]
+    m = m.sort_values("lux")
+    h = m["heure_locale"] if "heure_locale" in m else pd.Series(np.nan, index=m.index)
+    cd = np.c_[m["lux"], m["sens"] if "sens" in m else np.ones(len(m)),
+               [f"{int(x)}h{int((x % 1) * 60):02d}" if pd.notna(x) else "" for x in h]]
+    return go.Scattermap(
+        lat=m["lat"], lon=m["lon"], mode="markers", name="Points chauds / froids",
+        marker=dict(size=taille_points(zoom, float(m["lat"].mean()) if len(m) else 48.8), color=m["lux"].clip(0, LUX_MAX),
+                    colorscale=ECHELLE, cmin=0, cmax=LUX_MAX, opacity=0.55,
+                    colorbar=dict(title="lux", **BARRE_COULEUR)),
+        customdata=cd, hovertemplate="<b>%{customdata[0]:.1f} lx</b><br>sens %{customdata[1]} · %{customdata[2]}"
+                                     "<extra></extra>")
+
+
+def carte(data, mode, couleur, couches, sdal, selection, fond, sens, vue, uirev):
+    """Figure complète + index des traces (pour les mises à jour partielles par Patch)."""
     m = data["mesures"]
+    vue = vue or {}
+    zoom = vue.get("zoom") or ZOOM0
+    meta = {"lum": [], "sus": [], "points": [], "i_tr": None, "i_pt": None}
     if m is None:
-        return carte_vide("Aucune mesure dans ce rapport"), 0
+        return carte_vide("Aucune mesure dans ce rapport"), meta
     fig = go.Figure()
 
     if mode == "troncons":
         if data["troncons"] is None:
-            return carte_vide("Filaire de voirie indisponible (réseau ?) : " + (data["erreur_troncons"] or "")), 0
+            return carte_vide("Filaire de voirie indisponible (réseau ?) : " + (data["erreur_troncons"] or "")), meta
         for t in _traces_troncons(data, avec_seuils(data["troncons"], sdal), couleur):
             fig.add_trace(t)
 
@@ -305,37 +374,37 @@ def carte(data, mode, couleur, couches, sdal, selection):
         survol = ("<b>%{customdata[0]:.1f} lx</b> (moyenne des deux sens)<br>%{customdata[8]}"
                   "<br>Médiane : %{customdata[1]:.1f} lx · U0 : %{customdata[2]:.2f} · passages : %{customdata[3]}"
                   "<br>Seuil (%{customdata[7]}) : %{customdata[6]} lx<extra></extra>")
-        sens = [f"sens 1 : {fmt(a, ' lx')} · sens 2 : {fmt(b, ' lx')}" for a, b in zip(p["E_sens1"], p["E_sens2"])]
+        sens_txt = [f"sens 1 : {fmt(a, ' lx')} · sens 2 : {fmt(b, ' lx')}" for a, b in zip(p["E_sens1"], p["E_sens2"])]
         cd = np.c_[p.reindex(columns=["E_moy", "E_med", "U0", "n_passages", "_lat", "_lon", "seuil"]).values,
-                   p["classe"].map(lambda c: T.CLASSES[c][0]).values, sens]
+                   p["classe"].map(lambda c: T.CLASSES[c][0]).values, sens_txt]
         if couleur == "eclairement":
             fig.add_trace(go.Choroplethmap(
-                geojson=gj, locations=p["_id"], z=p["E_moy"], colorscale=ECHELLE,
-                zmin=0, zmax=p["E_moy"].quantile(0.98), marker_line_width=0, marker_opacity=0.85,
-                colorbar=dict(title="lux", thickness=12, x=0.99, xanchor="right", len=0.6),
-                customdata=cd, hovertemplate=survol, name="Hexagones"))
+                geojson=gj, locations=p["_id"], z=p["E_moy"].clip(0, LUX_MAX), colorscale=ECHELLE,
+                zmin=0, zmax=LUX_MAX, marker_line_width=0, marker_opacity=0.9,
+                colorbar=dict(title="lux", **BARRE_COULEUR), customdata=cd, hovertemplate=survol, name="Hexagones"))
         else:
             fig.add_trace(go.Choroplethmap(
                 geojson=gj, locations=p["_id"], z=(p["E_moy"] >= seuil).astype(int),
                 colorscale=[[0, ROUGE], [0.5, ROUGE], [0.5, VERT], [1, VERT]],
-                zmin=0, zmax=1, marker_line_width=0, marker_opacity=0.8,
-                colorbar=dict(tickvals=[0.25, 0.75], ticktext=["Non conforme", "Conforme"], thickness=12,
-                              x=0.99, xanchor="right", len=0.4),
+                zmin=0, zmax=1, marker_line_width=0, marker_opacity=0.85,
+                colorbar=dict(tickvals=[0.25, 0.75], ticktext=["Non conforme", "Conforme"],
+                              **{**BARRE_COULEUR, "len": 0.35}),
                 customdata=cd, hovertemplate=survol, name="Conformité"))
 
-    elif mode == "densite":
-        fig.add_trace(go.Densitymap(
-            lat=m["lat"], lon=m["lon"], z=m["lux"], radius=10, colorscale="Spectral_r",
-            zmax=m["lux"].quantile(0.98), hoverinfo="skip", name="Densité",
-            colorbar=dict(title="lux", thickness=12, x=0.99, xanchor="right", len=0.6)))
+    elif mode == "points":
+        meta["points"] = [len(fig.data)]
+        fig.add_trace(_trace_points(m, sens, zoom))
 
+    # couches toujours présentes : les interrupteurs ne changent que leur visibilité (Patch)
     lum = data["luminaires"]
-    if "lum" in couches and lum is not None:
+    if lum is not None:
         if "type" in lum:                                     # lampadaires estimés, par type de lampe
             for typ, g in lum.groupby("type"):
+                meta["lum"].append(len(fig.data))
                 fig.add_trace(go.Scattermap(
                     lat=g["lat"], lon=g["lon"], mode="markers", name=f"💡 {typ.replace('_', ' ')} ({len(g)})",
-                    marker=dict(size=7, color=COUL_TYPES.get(typ, "#ffffff"), opacity=0.95),
+                    visible="lum" in couches,
+                    marker=dict(size=8, color=COUL_TYPES.get(typ, "#ffffff"), opacity=1),
                     customdata=g.reindex(columns=["type_libelle", "puissance_w", "puissance_min_w",
                                                   "puissance_max_w", "cote", "E_pic", "n_passages"])
                     .assign(_marque="lampe").values,                 # 8 champs : distinct des tronçons (7)
@@ -343,56 +412,91 @@ def carte(data, mode, couleur, couches, sdal, selection):
                                   "(%{customdata[2]:.0f}–%{customdata[3]:.0f})<br>Côté : %{customdata[4]}"
                                   " · pic %{customdata[5]:.0f} lx · %{customdata[6]} passage(s)<extra></extra>"))
         else:
+            meta["lum"].append(len(fig.data))
             fig.add_trace(go.Scattermap(
                 lat=lum["lat"], lon=lum["lon"], mode="markers", name="Luminaires détectés",
-                marker=dict(size=5, color="#ffffff", opacity=0.75),
+                visible="lum" in couches, marker=dict(size=5, color="#ffffff", opacity=0.75),
                 customdata=lum.reindex(columns=["E_pic", "n_detections"]).values,
                 hovertemplate="💡 Luminaire détecté<br>Pic : %{customdata[0]:.0f} lx"
                               "<br>Détections : %{customdata[1]}<extra></extra>"))
 
     s = data["supports"]
-    if "sus" in couches and s is not None and "suspect" in s and s["suspect"].any():
+    if s is not None and "suspect" in s and s["suspect"].any():
         sus = s[s["suspect"]]
+        meta["sus"].append(len(fig.data))
         fig.add_trace(go.Scattermap(
             lat=sus["LATITUDE"], lon=sus["LONGITUDE"], mode="markers", name="Supports suspects éteints",
-            marker=dict(size=12, color=CYAN), text=sus["NUMERO"].astype(str) + " — " + sus["ZONE"].astype(str),
+            visible="sus" in couches, marker=dict(size=12, color=CYAN),
+            text=sus["NUMERO"].astype(str) + " — " + sus["ZONE"].astype(str),
             hovertemplate="⚠ %{text}<extra>suspect éteint</extra>"))
 
-    # point Street View sélectionné : toujours la dernière trace (mise à jour par Patch)
+    # sélection : tronçon surligné puis point Street View (les deux dernières traces, mises à jour par Patch)
     sel = selection or {}
-    fig.add_trace(go.Scattermap(lat=[sel.get("lat")] if sel else [], lon=[sel.get("lon")] if sel else [],
+    tr_lat, tr_lon = sel.get("tr_lat") or [], sel.get("tr_lon") or []
+    meta["i_tr"] = len(fig.data)
+    fig.add_trace(go.Scattermap(lat=tr_lat, lon=tr_lon, mode="lines", line=dict(width=10, color=CYAN),
+                                opacity=0.55, name="Tronçon sélectionné", showlegend=False, hoverinfo="skip"))
+    meta["i_pt"] = len(fig.data)
+    fig.add_trace(go.Scattermap(lat=[sel["lat"]] if sel else [], lon=[sel["lon"]] if sel else [],
                                 mode="markers", name="Point Street View", showlegend=False, hoverinfo="skip",
                                 marker=dict(size=18, color=CYAN, opacity=0.95)))
 
-    fig.update_layout(map=dict(style=MAP_STYLE, center={"lat": m["lat"].mean(), "lon": m["lon"].mean()},
-                               zoom=13.6),
-                      margin=dict(l=0, r=0, t=0, b=0), height=CARTE_H, uirevision="carte",
+    clair = fond == "clair"
+    centre = vue.get("center") or {"lat": m["lat"].mean(), "lon": m["lon"].mean()}
+    fig.update_layout(map=dict(style=FONDS[fond], center=centre, zoom=zoom),   # vue courante : pas de saut
+                      margin=dict(l=0, r=0, t=0, b=0), height=CARTE_H, uirevision=uirev or "carte",
                       showlegend=True,
-                      legend=dict(x=0.01, y=0.99, bgcolor="rgba(13,17,23,0.8)", bordercolor="#30363d",
-                                  borderwidth=1, font_size=11))
-    return fig, len(fig.data) - 1
+                      legend=dict(x=0.01, y=0.99, bgcolor="rgba(255,255,255,0.88)" if clair else "rgba(13,17,23,0.8)",
+                                  bordercolor="#c9ced6" if clair else "#30363d", borderwidth=1, font_size=11,
+                                  font_color="#1f2328" if clair else "#e6edf3"))
+    return fig, meta
 
 
-# ------------------------------------------------------------------ GRAPHIQUES
-def barres_deficit(tr, n=15):
-    """Tronçons les plus loin de leur seuil SDAL (cliquables -> Street View)."""
+# ------------------------------------------------------------------ PANNEAUX
+def deficits_par_rue(tr, n=12):
+    """Rues classées par déficit cumulé : Σ longueur × (1 − E/seuil) sur leurs tronçons non conformes.
+    Chaque ligne renvoie sur le tronçon le plus sombre de la rue."""
     if tr is None or tr.empty:
-        return carte_vide("Pas de tronçons", 430)
-    r = tr.sort_values("ratio").head(n).iloc[::-1].reset_index(drop=True)
-    noms = [f"{x[:26]}…" if len(x) > 27 else x for x in r["nom"]]
-    couleurs = [VERT if c else ("#ff9f43" if a else ROUGE) for c, a in zip(r["conforme"], r["a_completer"])]
-    fig = go.Figure(go.Bar(
-        x=r["E_moy"], y=list(range(len(r))), orientation="h", marker_color=couleurs, marker_line_width=0,
-        customdata=np.c_[r["id"], r["nom"], r["seuil"], r["classe"].map(lambda c: T.CLASSES[c][0])],
-        hovertemplate="<b>%{customdata[1]}</b><br>%{x:.1f} lx — seuil %{customdata[2]} lx"
-                      "<br>%{customdata[3]}<br><i>clic : voir dans Street View</i><extra></extra>"))
-    fig.add_trace(go.Scatter(x=r["seuil"], y=list(range(len(r))), mode="markers", hoverinfo="skip",
-                             marker=dict(symbol="line-ns", size=14, line=dict(width=2, color=AMBRE)),
-                             showlegend=False))
-    fig.update_layout(height=430, margin=dict(l=4, r=10, t=6, b=30), bargap=0.25, showlegend=False,
-                      xaxis_title="E moyen (lx) — trait : seuil SDAL",
-                      yaxis=dict(tickvals=list(range(len(r))), ticktext=noms, tickfont_size=11))
-    return fig
+        return html.P("Pas de tronçons.", className="text-muted")
+    t = tr.assign(manque=(1 - tr["ratio"]).clip(lower=0), lg_nc=tr["longueur_m"].where(~tr["conforme"], 0),
+                  e_lg=tr["E_moy"] * tr["longueur_m"], s_lg=tr["seuil"] * tr["longueur_m"])
+    t["score"] = t["manque"] * t["longueur_m"]
+    g = t.groupby("nom").agg(score=("score", "sum"), lg=("longueur_m", "sum"), lg_nc=("lg_nc", "sum"),
+                             e_lg=("e_lg", "sum"), s_lg=("s_lg", "sum"), n=("id", "size"),
+                             n_nc=("conforme", lambda c: int((~c).sum())),
+                             incomplet=("a_completer", "any"), classe=("classe", lambda c: c.mode().iat[0]))
+    g["E"] = g["e_lg"] / g["lg"]
+    g["S"] = g["s_lg"] / g["lg"]
+    pire = t.sort_values("ratio").groupby("nom")["id"].first()
+    g = g[g["lg_nc"] > 0].sort_values("score", ascending=False).head(n)
+    if g.empty:
+        return dbc.Alert([html.I(className="bi bi-check-circle me-2"), "Toutes les rues respectent leur seuil SDAL."],
+                         color="success", className="mb-0")
+    lignes = []
+    for rang, (nom, r) in enumerate(g.iterrows(), 1):
+        pct = float(min(100, 100 * r["E"] / r["S"])) if r["S"] else 0
+        coul = "danger" if pct < 50 else "warning" if pct < 100 else "success"
+        lignes.append(html.Button(id={"type": "deficit", "index": str(pire[nom])}, n_clicks=0,
+                                  className="ligne-deficit", children=[
+            html.Div(f"{rang}", className="deficit-rang"),
+            html.Div(className="deficit-corps", children=[
+                html.Div([html.Span(nom, className="deficit-nom"),
+                          html.Span(T.CLASSES[r["classe"]][0], className="badge-type"),
+                          html.Span([html.I(className="bi bi-arrow-left-right me-1"), "1 sens"],
+                                    className="badge-alerte") if r["incomplet"] else None],
+                         className="d-flex align-items-center gap-2 flex-wrap"),
+                html.Div(f"{fmt(r['lg_nc'], ' m', 0)} sous le seuil sur {fmt(r['lg'], ' m', 0)} · "
+                         f"{r['n_nc']} / {r['n']} tronçon(s)", className="deficit-detail"),
+                dbc.Progress(value=pct, color=coul, className="deficit-barre"),
+            ]),
+            html.Div([html.Div(fmt(r["E"], " lx"), className=f"deficit-valeur text-{coul}"),
+                      html.Div(f"seuil {fmt(r['S'], ' lx')}", className="deficit-seuil")], className="text-end"),
+        ]))
+    return html.Div([
+        html.Div("Classement par déficit cumulé (longueur × écart au seuil). Cliquez une rue : la carte "
+                 "va sur son tronçon le plus sombre.", className="small text-muted mb-2"),
+        html.Div(lignes, className="liste-deficits"),
+    ])
 
 
 def distribution(tr):
@@ -400,8 +504,7 @@ def distribution(tr):
     if tr is None or tr.empty:
         return carte_vide("Pas de tronçons", 360)
     fig = go.Figure()
-    ordre = [c for c in T.CLASSES if c in set(tr["classe"])]
-    for c in ordre:
+    for c in [c for c in T.CLASSES if c in set(tr["classe"])]:
         sous = tr[tr["classe"] == c]
         lib = f"{T.CLASSES[c][0]} ({len(sous)})"
         fig.add_trace(go.Box(x=sous["E_moy"], name=lib, boxpoints="all", jitter=0.4, pointpos=0,
@@ -452,6 +555,18 @@ def chronologie(data):
     return fig
 
 
+STYLE_TABLE = dict(
+    style_table={"overflowX": "auto", "minWidth": "100%"},
+    style_header={"backgroundColor": "#161b22", "color": "#e6edf3", "fontWeight": "600",
+                  "border": "none", "borderBottom": "1px solid #30363d"},
+    style_filter={"backgroundColor": "#0d1117", "color": "#e6edf3"},
+    style_cell={"backgroundColor": "transparent", "color": "#c9d1d9", "border": "none",
+                "borderBottom": "1px solid #21262d", "textAlign": "left", "padding": "7px 10px",
+                "fontFamily": "Inter, system-ui, sans-serif", "fontSize": "13px", "cursor": "pointer",
+                "whiteSpace": "normal", "height": "auto"},
+)
+
+
 def tableau_troncons(tr):
     if tr is None or tr.empty:
         return html.P("Pas de tronçons dans ce rapport.", className="text-muted")
@@ -467,31 +582,35 @@ def tableau_troncons(tr):
     return html.Div([
         html.P("E moy. = moyenne des deux sens de circulation (chaque sens = moyenne de ses passages). "
                "⚠️ : un seul sens mesuré sur une voie à double sens, à repasser. "
-               "Cliquez une ligne pour la voir dans Street View.", className="small text-muted"),
+               "Cliquez une ligne : la carte va sur le tronçon.", className="small text-muted"),
         dash_table.DataTable(
-            id="table-troncons", data=r.to_dict("records"),
-            columns=[{"name": n, "id": c} for c, n in cols],
-            sort_action="native", filter_action="native", page_size=12,
-            style_table={"overflowX": "auto", "minWidth": "100%"},
-            style_header={"backgroundColor": "#161b22", "color": "#e6edf3", "fontWeight": "600",
-                          "border": "none", "borderBottom": "1px solid #30363d"},
-            style_filter={"backgroundColor": "#0d1117", "color": "#e6edf3"},
-            style_cell={"backgroundColor": "transparent", "color": "#c9d1d9", "border": "none",
-                        "borderBottom": "1px solid #21262d", "textAlign": "left", "padding": "7px 10px",
-                        "fontFamily": "Inter, system-ui, sans-serif", "fontSize": "13px", "cursor": "pointer",
-                        "whiteSpace": "normal", "height": "auto"},
+            id="table-troncons", data=r.to_dict("records"), columns=[{"name": n, "id": c} for c, n in cols],
+            sort_action="native", filter_action="native", page_size=12, **STYLE_TABLE,
             style_data_conditional=[
-                {"if": {"filter_query": '{conforme} = false'}, "backgroundColor": "rgba(255,92,92,0.10)"},
-                {"if": {"state": "active"}, "backgroundColor": "rgba(56,217,245,0.15)",
-                 "border": "1px solid #38d9f5"}],
+                {"if": {"filter_query": '{conforme} = false'}, "backgroundColor": "rgba(229,72,77,0.10)"},
+                {"if": {"state": "active"}, "backgroundColor": "rgba(56,217,245,0.15)", "border": "1px solid #38d9f5"}],
         ),
     ])
 
 
-def qualite(data):
+def troncons_a_fiabiliser(tr):
+    """Tronçons dont la moyenne est fragile : un seul sens, couverture faible, passages incohérents."""
+    if tr is None or tr.empty:
+        return []
+    lignes = []
+    for r in tr.itertuples():
+        if r.a_completer:
+            lignes.append((r, "Un seul sens mesuré", f"sens 1 : {fmt(r.E_sens1, ' lx')} · sens 2 : {fmt(r.E_sens2, ' lx')}"))
+        if r.couverture < 60:
+            lignes.append((r, "Couverture faible", f"{r.couverture} % de la longueur mesurée"))
+        if r.n_passages >= 3 and r.cv_passages > 35:
+            lignes.append((r, "Passages incohérents", f"écart entre passages {r.cv_passages} % ({r.n_passages} passages)"))
+    return [{"id": f"{r.id}|{k}", "nom": r.nom, "probleme": p, "detail": d, "E_moy": r.E_moy,
+             "longueur_m": r.longueur_m} for k, (r, p, d) in enumerate(lignes)]
+
+
+def qualite(data, tr):
     q, k = data["resume"].get("qualite", {}), data["resume"].get("kpi", {})
-    if not q:
-        return html.P("Pas d'indicateurs de qualité dans ce rapport.", className="text-muted")
     lignes = [
         ("Source GNSS", q.get("gnss_source")),
         ("Positions GNSS", fmt(q.get("n_pos"), dec=0)),
@@ -502,17 +621,34 @@ def qualite(data):
         ("Mailles vues plusieurs fois", f"{fmt(k.get('n_multi', k.get('n_hex_multi')), dec=0)} — CV médian "
                                         f"{fmt(k.get('cv_maille_med', k.get('cv_multi_med')), ' %', 0)}"),
     ]
+    m = data["mesures"]
+    if m is not None and "lux_brut" in m:
+        d = (m["lux_brut"] - m["lux"]).abs()
+        lignes.append(("Effet du lissage du bruit", f"{fmt(100 * (d > 0.5).mean(), ' %', 1)} des points modifiés · "
+                                                   f"écart max {fmt(d.max(), ' lx', 0)}"))
     cal = data["resume"].get("calage") or {}
     if cal.get("ok"):
         lignes.append(("Calage capteurs / GPS (auto)",
                        f"décalage {fmt(cal.get('decalage_m'), ' m', 2)} · latence {fmt(cal.get('latence_s'), ' s', 2)}"))
-    if data["troncons"] is not None:
-        tr = data["troncons"]
+    if tr is not None:
         lignes += [("Tronçons de voirie (OSM) mesurés", fmt(len(tr), dec=0)),
-                   ("Écart médian entre les deux sens",
-                    fmt((tr["E_sens1"] - tr["E_sens2"]).abs().median(), " lx"))]
-    return dbc.Table(html.Tbody([html.Tr([html.Td(a, className="text-muted"), html.Td(b or "–")])
-                                 for a, b in lignes]), size="sm", className="mb-0 tableau-qualite")
+                   ("Écart médian entre les deux sens", fmt((tr["E_sens1"] - tr["E_sens2"]).abs().median(), " lx"))]
+    fiab = troncons_a_fiabiliser(tr)
+    return html.Div([
+        dbc.Table(html.Tbody([html.Tr([html.Td(a, className="text-muted"), html.Td(b or "–")]) for a, b in lignes]),
+                  size="sm", className="mb-3 tableau-qualite"),
+        html.H6([html.I(className="bi bi-exclamation-diamond me-2 text-warning"),
+                 f"Tronçons à fiabiliser ({len(fiab)})"], className="fw-semibold"),
+        html.P("Moyennes fragiles : à repasser ou à vérifier. Cliquez une ligne : la carte va sur le tronçon.",
+               className="small text-muted"),
+        dash_table.DataTable(
+            id="table-qualite", data=fiab, page_size=8, sort_action="native", filter_action="native",
+            columns=[{"name": "Voie", "id": "nom"}, {"name": "Problème", "id": "probleme"},
+                     {"name": "Détail", "id": "detail"}, {"name": "E moy. (lx)", "id": "E_moy"},
+                     {"name": "Long. (m)", "id": "longueur_m"}], **STYLE_TABLE,
+            style_data_conditional=[{"if": {"state": "active"}, "backgroundColor": "rgba(56,217,245,0.15)",
+                                     "border": "1px solid #38d9f5"}]),
+    ])
 
 
 # ------------------------------------------------------------------ MISE EN PAGE
@@ -524,10 +660,13 @@ def carte_bloc(titre, icone, corps, droite=None, **kw):
     ], className="bloc")
 
 
-def segmente(id_, valeur, options):
-    return dbc.RadioItems(id=id_, value=valeur, className="btn-group btn-group-sm segmente",
-                          inputClassName="btn-check", labelClassName="btn btn-outline-secondary",
-                          labelCheckedClassName="active", options=options)
+def segmente(id_, valeur, options, titre=None):
+    radio = dbc.RadioItems(id=id_, value=valeur, className="btn-group btn-group-sm segmente",
+                           inputClassName="btn-check", labelClassName="btn btn-outline-secondary",
+                           labelCheckedClassName="active", options=options)
+    if not titre:
+        return radio
+    return html.Div([html.Span(titre, className="outil-titre"), radio], className="outil")
 
 
 upload_style = {"border": "1.5px dashed #3d444d", "borderRadius": "10px", "padding": "22px",
@@ -542,7 +681,8 @@ champs_sdal = [
     ]) for c, (lib, _, v) in T.CLASSES.items()]
 
 app.layout = html.Div(className="page", children=[
-    dcc.Store(id="selection"), dcc.Store(id="i-sel"),
+    dcc.Store(id="selection"), dcc.Store(id="carte-meta"), dcc.Store(id="vue", data={}),
+    dcc.Store(id="uirev", data="carte"), html.Div(id="defilement", hidden=True),
     # --- barre du haut
     html.Header(className="entete", children=dbc.Container(fluid=True, children=dbc.Row(
         align="center", className="g-2", children=[
@@ -572,26 +712,36 @@ app.layout = html.Div(className="page", children=[
 
         dbc.Row(className="g-3", children=[
             # --- carte
-            dbc.Col(xl=8, children=dbc.Card(className="bloc", children=[
-                dbc.CardHeader(html.Div([
-                    html.Div([
-                        segmente("mode-carte", "troncons", [
-                            {"label": [html.I(className="bi bi-bezier2 me-1"), "Moyenne au tronçon"], "value": "troncons"},
-                            {"label": [html.I(className="bi bi-hexagon me-1"), "Hexagones"], "value": "hex"},
-                            {"label": [html.I(className="bi bi-fire me-1"), "Densité"], "value": "densite"}]),
-                        segmente("couleur-carte", "eclairement", [
-                            {"label": "Éclairement", "value": "eclairement"},
-                            {"label": "Conformité SDAL", "value": "conformite"}]),
-                    ], className="d-flex flex-wrap gap-2"),
-                    dbc.Checklist(id="couches", value=["sus"], inline=True, switch=True, className="small",
+            dbc.Col(xl=8, children=dbc.Card(id="bloc-carte", className="bloc", children=[
+                dbc.CardHeader(html.Div(className="barre-outils", children=[
+                    segmente("mode-carte", "troncons", [
+                        {"label": [html.I(className="bi bi-bezier2 me-1"), "Tronçons"], "value": "troncons"},
+                        {"label": [html.I(className="bi bi-hexagon me-1"), "Hexagones"], "value": "hex"},
+                        {"label": [html.I(className="bi bi-thermometer-half me-1"), "Points chauds / froids"],
+                         "value": "points"}], "Vue"),
+                    segmente("couleur-carte", "eclairement", [
+                        {"label": "Éclairement", "value": "eclairement"},
+                        {"label": "Conformité SDAL", "value": "conformite"}], "Couleur"),
+                    segmente("lissage", "apres", [
+                        {"label": [html.I(className="bi bi-soundwave me-1"), "Avant"], "value": "avant"},
+                        {"label": [html.I(className="bi bi-activity me-1"), "Après lissage"], "value": "apres"}],
+                        "Bruit"),
+                    segmente("sens", "tous", [
+                        {"label": "2 sens", "value": "tous"}, {"label": "Sens 1", "value": "1"},
+                        {"label": "Sens 2", "value": "2"}], "Sens (points)"),
+                    segmente("fond", "sombre", [
+                        {"label": [html.I(className="bi bi-moon-stars me-1"), "Sombre"], "value": "sombre"},
+                        {"label": [html.I(className="bi bi-sun me-1"), "Clair"], "value": "clair"}], "Fond"),
+                    dbc.Checklist(id="couches", value=[], switch=True, className="small outil-couches",
                                   options=[{"label": "Lampadaires estimés", "value": "lum"},
                                            {"label": "Supports suspects", "value": "sus"}]),
-                ], className="d-flex justify-content-between align-items-center flex-wrap gap-2")),
-                dbc.CardBody(dcc.Loading(dcc.Graph(id="carte", config={"scrollZoom": True, "displaylogo": False}),
-                                         type="circle", color=AMBRE), className="p-0"),
+                ])),
+                html.Div(id="bandeau-lissage"),
+                dbc.CardBody(dcc.Graph(id="carte", config={"scrollZoom": True, "displaylogo": False}),
+                             className="p-0"),
                 dbc.CardFooter([html.I(className="bi bi-cursor me-2"),
-                                "Cliquez sur la carte, un tronçon du classement ou une ligne du tableau : "
-                                "Street View s'affiche à droite, orienté dans le sens de la tournée."],
+                                "Cliquez sur la carte, une rue du classement ou une ligne d'un tableau : "
+                                "la carte va sur le tronçon et Street View s'affiche à droite."],
                                className="small text-muted"),
             ])),
             # --- Street View + SDAL
@@ -614,9 +764,8 @@ app.layout = html.Div(className="page", children=[
         ]),
 
         dbc.Row(className="g-3 mt-0", children=[
-            dbc.Col(xl=5, children=carte_bloc(
-                "Tronçons les plus en déficit", "sort-down",
-                dcc.Graph(id="barres", config={"displayModeBar": False}), className="p-1")),
+            dbc.Col(xl=5, children=carte_bloc("Rues les plus en déficit", "sort-down",
+                                              html.Div(id="deficits"))),
             dbc.Col(xl=7, children=dbc.Card(className="bloc h-100", children=[
                 dbc.CardHeader(dbc.Tabs(id="onglets", active_tab="troncons", className="card-header-tabs", children=[
                     dbc.Tab(label="Tronçons", tab_id="troncons"),
@@ -634,9 +783,8 @@ app.layout = html.Div(className="page", children=[
                 ]),
             ])),
         ]),
-        html.Footer("Hackathon 2026 — mesures GETYS · lampadaires estimés par getys_analyse.py · "
-                    "filaire © contributeurs OpenStreetMap",
-                    className="pied"),
+        html.Footer("Hackathon 2026 — mesures GETYS · lampadaires estimés et palette de carte.html "
+                    "(getys_rapport.py) · filaire © contributeurs OpenStreetMap", className="pied"),
     ]),
 
     # --- envoi d'une nouvelle tournée
@@ -662,6 +810,7 @@ app.layout = html.Div(className="page", children=[
 ])
 
 SDAL_INPUTS = [Input(f"sdal-{c}", "value") for c in T.CLASSES]
+SDAL_STATES = [State(f"sdal-{c}", "value") for c in T.CLASSES]
 
 
 def sdal_de(valeurs):
@@ -753,14 +902,14 @@ def changer_onglet(onglet):
 
 
 # ------------------------------------------------------------------ CALLBACKS : AFFICHAGE
-@app.callback(Output("contexte", "children"), Output("kpis", "children"), Output("barres", "figure"),
+@app.callback(Output("contexte", "children"), Output("kpis", "children"), Output("deficits", "children"),
               Output("distrib", "figure"), Output("lampes", "figure"), Output("chrono", "figure"),
               Output("tableau", "children"), Output("qualite", "children"),
               Input("choix-rapport", "value"), *SDAL_INPUTS)
 def afficher(dossier, *valeurs):
     if not dossier:
         vide = carte_vide("Aucune tournée analysée — cliquez sur « Nouvelle tournée »", 360)
-        return None, [], vide, vide, vide, vide, None, None
+        return None, [], None, vide, vide, vide, None, None
     sdal = sdal_de(valeurs)
     data = charger(dossier)
     meta = data["resume"].get("meta", {})
@@ -815,32 +964,111 @@ def afficher(dossier, *valeurs):
         kpis.append(kpi("arrow-left-right", "À repasser", f"{n_comp}",
                         "tronçons à double sens mesurés dans un seul sens", "warning" if n_comp else "success"))
 
-    return ([contexte, alerte], kpis, barres_deficit(tr), distribution(tr), types_lampes(data),
-            chronologie(data), tableau_troncons(tr), qualite(data))
+    return ([contexte, alerte], kpis, deficits_par_rue(tr), distribution(tr), types_lampes(data),
+            chronologie(data), tableau_troncons(tr), qualite(data, tr))
 
 
-@app.callback(Output("carte", "figure"), Output("i-sel", "data"),
+# ------------------------------------------------------------------ CALLBACKS : CARTE
+# La figure n'est reconstruite que si les données affichées changent (tournée, vue, couleur, lissage, sens,
+# seuils en mode conformité). Le fond, les couches, la taille des points et la sélection passent par Patch :
+# la carte garde son zoom et ne clignote pas.
+@app.callback(Output("carte", "figure"), Output("carte-meta", "data"), Output("bandeau-lissage", "children"),
               Input("choix-rapport", "value"), Input("mode-carte", "value"), Input("couleur-carte", "value"),
-              Input("couches", "value"), *SDAL_INPUTS, State("selection", "data"))
-def afficher_carte(dossier, mode, couleur, couches, *reste):
-    *valeurs, selection = reste
+              Input("lissage", "value"), Input("sens", "value"), *SDAL_INPUTS,
+              State("couches", "value"), State("selection", "data"), State("fond", "value"),
+              State("vue", "data"), State("uirev", "data"))
+def afficher_carte(dossier, mode, couleur, lissage, sens, *reste):
+    *valeurs, couches, selection, fond, vue, uirev = reste
     if not dossier:
-        return carte_vide("Aucune tournée analysée"), 0
-    if ctx.triggered_id and str(ctx.triggered_id).startswith("sdal-") and couleur != "conformite":
-        return dash.no_update, dash.no_update            # les seuils ne changent que la vue conformité
-    return carte(charger(dossier), mode, couleur, couches or [], sdal_de(valeurs), selection)
+        return carte_vide("Aucune tournée analysée"), {}, None
+    declencheur = str(ctx.triggered_id or "")
+    if declencheur.startswith("sdal-") and not (couleur == "conformite" and mode != "points"):
+        return dash.no_update, dash.no_update, dash.no_update       # les seuils ne changent que la conformité
+    if declencheur == "sens" and mode != "points":
+        return dash.no_update, dash.no_update, dash.no_update
+    if declencheur == "choix-rapport":
+        vue, selection = {}, None                                    # nouvelle tournée : vue d'ensemble
+    brut = lissage == "avant"
+    data = charger(dossier, brut=brut)
+    if mode == "points" and couleur == "conformite":
+        couleur = "eclairement"
+    fig, meta = carte(data, mode, couleur, couches or [], sdal_de(valeurs), selection, fond, sens, vue, uirev)
+    bandeau = None
+    if brut:
+        texte = ("Avant lissage : signal brut (médiane des 3 capteurs, sans filtre de Hampel ni suppression des pics "
+                 "aberrants). Comparez avec « Après lissage ».")
+        if not data["brut"]:
+            texte = "Ce rapport ne contient pas le signal brut (colonne E_brut) : relancez l'analyse pour l'obtenir."
+        bandeau = html.Div([html.I(className="bi bi-soundwave me-2"), texte], className="bandeau-lissage")
+    return fig, meta, bandeau
 
 
-# ------------------------------------------------------------------ CALLBACKS : STREET VIEW
+@app.callback(Output("carte", "figure", allow_duplicate=True), Input("fond", "value"), prevent_initial_call=True)
+def changer_fond(fond):
+    clair = fond == "clair"
+    p = Patch()
+    p["layout"]["map"]["style"] = FONDS[fond]
+    p["layout"]["legend"]["bgcolor"] = "rgba(255,255,255,0.88)" if clair else "rgba(13,17,23,0.8)"
+    p["layout"]["legend"]["bordercolor"] = "#c9ced6" if clair else "#30363d"
+    p["layout"]["legend"]["font"]["color"] = "#1f2328" if clair else "#e6edf3"
+    return p
+
+
+@app.callback(Output("carte", "figure", allow_duplicate=True), Input("couches", "value"),
+              State("carte-meta", "data"), prevent_initial_call=True)
+def changer_couches(couches, meta):
+    if not meta:
+        return dash.no_update
+    p = Patch()
+    for cle in ("lum", "sus"):
+        for i in meta.get(cle, []):
+            p["data"][i]["visible"] = cle in (couches or [])
+    return p
+
+
+@app.callback(Output("carte", "figure", allow_duplicate=True), Output("vue", "data"),
+              Input("carte", "relayoutData"), State("carte-meta", "data"), State("vue", "data"),
+              prevent_initial_call=True)
+def suivre_vue(relayout, meta, vue):
+    """Mémorise la vue (centre, zoom) pour les reconstructions ; points chauds/froids : rayon constant en
+    mètres -> taille en pixels recalculée à chaque zoom."""
+    if not relayout or not any(k in relayout for k in ("map.zoom", "map.center")):
+        return dash.no_update, dash.no_update
+    vue = {**(vue or {}), **{k.split(".")[1]: v for k, v in relayout.items() if k in ("map.zoom", "map.center")}}
+    if not meta or not meta.get("points") or "map.zoom" not in relayout:
+        return dash.no_update, vue
+    lat = (vue.get("center") or {}).get("lat", 48.8)
+    p = Patch()
+    for i in meta["points"]:
+        p["data"][i]["marker"]["size"] = taille_points(vue["zoom"], lat)
+    return p, vue
+
+
+# ------------------------------------------------------------------ CALLBACKS : SÉLECTION -> CARTE + STREET VIEW
+def _selection_troncon(data, tid, titre_extra=None):
+    r = data["troncons"].set_index("id").loc[tid]
+    lat, lon, cap = point_le_plus_sombre(data, tid)
+    glon, glat = data["geoms"][tid]
+    detail = (f"point le plus sombre · tronçon {fmt(r['E_moy'], ' lx')} "
+              f"(sens 1 : {fmt(r['E_sens1'], ' lx')}, sens 2 : {fmt(r['E_sens2'], ' lx')})")
+    if titre_extra:
+        detail = f"{titre_extra} · {detail}"
+    lg = float(r["longueur_m"])
+    return {"lat": lat, "lon": lon, "cap": cap, "titre": r["nom"], "detail": detail, "centrer": True,
+            "tid": tid, "tr_lat": list(glat), "tr_lon": list(glon),
+            "c_lat": float(np.mean(glat)), "c_lon": float(np.mean(glon)),
+            "zoom": 17.2 if lg < 80 else 16.6 if lg < 180 else 16.0}
+
+
 @app.callback(Output("selection", "data"),
-              Input("carte", "clickData"), Input("barres", "clickData"), Input("table-troncons", "active_cell"),
+              Input("carte", "clickData"), Input({"type": "deficit", "index": ALL}, "n_clicks"),
+              Input("table-troncons", "active_cell"), Input("table-qualite", "active_cell"),
               State("choix-rapport", "value"), prevent_initial_call=True)
-def choisir_point(clic_carte, clic_barre, cellule, dossier):
+def choisir_point(clic_carte, clics_deficit, cellule, cellule_q, dossier):
     if not dossier:
         return dash.no_update
     data = charger(dossier)
     src = ctx.triggered_id
-    tid = None
     if src == "carte" and clic_carte:
         pt = clic_carte["points"][0]
         cd = pt.get("customdata")
@@ -850,25 +1078,32 @@ def choisir_point(clic_carte, clic_barre, cellule, dossier):
             lat, lon = float(cd[4]), float(cd[5])
         else:
             return dash.no_update
-        titre, detail = "Point sélectionné", None
-        if isinstance(cd, list) and len(cd) == 7 and cd[1]:                  # tronçon
-            titre, detail = cd[1], f"{cd[2]} · {cd[3]}"
-        elif isinstance(cd, list) and len(cd) == 8 and cd[7] == "lampe":   # lampadaire estimé
-            titre = f"💡 Lampadaire estimé — {cd[0]}"
-            detail = f"{cd[1]:.0f} W estimés · côté {cd[4]} · pic {cd[5]:.0f} lx"
-        return {"lat": lat, "lon": lon, "cap": cap_proche(data, lat, lon), "titre": titre,
-                "detail": detail, "centrer": False}
-    if src == "barres" and clic_barre:
-        tid = clic_barre["points"][0]["customdata"][0]
+        sel = {"lat": lat, "lon": lon, "cap": cap_proche(data, lat, lon), "titre": "Point sélectionné",
+               "detail": None, "centrer": False}
+        if isinstance(cd, list) and len(cd) == 7 and cd[1] and data["geoms"] and cd[0] in data["geoms"]:  # tronçon
+            glon, glat = data["geoms"][cd[0]]
+            sel.update(titre=cd[1], detail=f"{cd[2]} · {cd[3]}", tid=cd[0], tr_lat=list(glat), tr_lon=list(glon))
+        elif isinstance(cd, list) and len(cd) == 8 and cd[7] == "lampe":          # lampadaire estimé
+            sel.update(titre=f"💡 Lampadaire estimé — {cd[0]}",
+                       detail=f"{cd[1]:.0f} W estimés · côté {cd[4]} · pic {cd[5]:.0f} lx")
+        elif isinstance(cd, list) and len(cd) == 3:                                # point chaud / froid
+            sel.update(titre="Point de mesure", detail=f"{float(cd[0]):.1f} lx · sens {cd[1]} · {cd[2]}")
+        elif isinstance(cd, list) and len(cd) >= 9:                                # hexagone
+            sel.update(titre="Hexagone de 10 m", detail=f"{float(cd[0]):.1f} lx · {cd[8]}")
+        return sel
+    tid, extra = None, None
+    if isinstance(src, dict) and src.get("type") == "deficit":
+        if not ctx.triggered or not ctx.triggered[0]["value"]:      # liste redessinée, pas un clic
+            return dash.no_update
+        tid = src["index"]
     elif src == "table-troncons" and cellule:
         tid = cellule.get("row_id")
+    elif src == "table-qualite" and cellule_q and cellule_q.get("row_id"):
+        tid = cellule_q["row_id"].split("|")[0]
+        extra = "à fiabiliser"
     if tid is None or data["geoms"] is None or tid not in data["geoms"]:
         return dash.no_update
-    r = data["troncons"].set_index("id").loc[tid]
-    lat, lon, cap = point_le_plus_sombre(data, tid)
-    return {"lat": lat, "lon": lon, "cap": cap, "titre": r["nom"], "centrer": True,
-            "detail": f"point le plus sombre · tronçon {fmt(r['E_moy'], ' lx')} "
-                      f"(sens 1 : {fmt(r['E_sens1'], ' lx')}, sens 2 : {fmt(r['E_sens2'], ' lx')})"}
+    return _selection_troncon(data, tid, extra)
 
 
 @app.callback(Output("sv-cadre", "children"), Output("sv-legende", "children"),
@@ -886,20 +1121,40 @@ def afficher_streetview(sel):
     return cadre, legende, lien_streetview(sel["lat"], sel["lon"], sel.get("cap", 0)), "small text-info"
 
 
-@app.callback(Output("carte", "figure", allow_duplicate=True), Input("selection", "data"),
-              State("i-sel", "data"), prevent_initial_call=True)
-def marquer_selection(sel, i_sel):
-    """Déplace le marqueur Street View sans redessiner la carte."""
-    if not sel or i_sel is None:
-        return dash.no_update
+@app.callback(Output("carte", "figure", allow_duplicate=True), Output("uirev", "data"),
+              Output("vue", "data", allow_duplicate=True),
+              Input("selection", "data"), State("carte-meta", "data"), prevent_initial_call=True)
+def marquer_selection(sel, meta):
+    """Surligne le tronçon, place le point Street View et, depuis une liste, centre la carte dessus."""
+    if not sel or not meta or meta.get("i_pt") is None:
+        return dash.no_update, dash.no_update, dash.no_update
     p = Patch()
-    p["data"][i_sel]["lat"] = [sel["lat"]]
-    p["data"][i_sel]["lon"] = [sel["lon"]]
-    if sel.get("centrer"):                                # sélection depuis la liste : on y va
-        p["layout"]["map"]["center"] = {"lat": sel["lat"], "lon": sel["lon"]}
-        p["layout"]["map"]["zoom"] = 16.5
-        p["layout"]["uirevision"] = f"{sel['lat']}{sel['lon']}"
-    return p
+    p["data"][meta["i_pt"]]["lat"] = [sel["lat"]]
+    p["data"][meta["i_pt"]]["lon"] = [sel["lon"]]
+    p["data"][meta["i_tr"]]["lat"] = sel.get("tr_lat") or []
+    p["data"][meta["i_tr"]]["lon"] = sel.get("tr_lon") or []
+    if not sel.get("centrer"):
+        return p, dash.no_update, dash.no_update
+    rev = f"sel-{sel.get('tid')}-{sel['lat']:.6f}"
+    zoom = sel.get("zoom", 16.5)
+    p["layout"]["map"]["center"] = {"lat": sel.get("c_lat", sel["lat"]), "lon": sel.get("c_lon", sel["lon"])}
+    p["layout"]["map"]["zoom"] = zoom
+    p["layout"]["uirevision"] = rev               # gardé pour les reconstructions suivantes : pas de saut de vue
+    for i in meta.get("points", []):
+        p["data"][i]["marker"]["size"] = taille_points(zoom, sel["lat"])
+    return p, rev, {"zoom": zoom, "center": {"lat": sel.get("c_lat", sel["lat"]), "lon": sel.get("c_lon", sel["lon"])}}
+
+
+# sélection depuis une liste : on fait défiler la page jusqu'à la carte
+app.clientside_callback(
+    """function(sel) {
+        if (sel && sel.centrer) {
+            const el = document.getElementById('bloc-carte');
+            if (el) el.scrollIntoView({behavior: 'smooth', block: 'start'});
+        }
+        return '';
+    }""",
+    Output("defilement", "children"), Input("selection", "data"), prevent_initial_call=True)
 
 
 if __name__ == "__main__":

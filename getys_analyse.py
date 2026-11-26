@@ -472,6 +472,8 @@ def analyser(tdms_path: Path, out_dir: Path, P: Params | None = None, log=print)
     mx = np.zeros(nb)
     np.maximum.at(mx, bm, Eraw[moving])
     pts["Emax_brut"] = mx[keep]
+    # signal brut moyen dans le pas (médiane des 3 capteurs, sans aucun filtrage) : comparaison avant / après lissage
+    pts["E_brut"] = bmean(np.median(L, axis=0))
     loc = pd.to_datetime(pts["t"], unit="s", utc=True).dt.tz_convert(TZ)
     pts["h_loc"] = loc.dt.hour + loc.dt.minute / 60 + loc.dt.second / 3600
     # passages (runs continus) : coupure si > 10 s sans point
@@ -676,8 +678,8 @@ def exports(out_dir: Path, pts, lum):
     lon, lat = TO_WGS.transform(pts["x"].to_numpy(), pts["y"].to_numpy())
     e = pts.assign(lon=lon, lat=lat)
     e["heure_locale"] = e["h_loc"].round(4)
-    e[["lon", "lat", "x", "y", "E", "L1", "L2", "L3", "Emax_brut", "v", "cap", "sens", "heure_locale", "passage"]] \
-        .round(dict(lon=7, lat=7, x=2, y=2, E=2, L1=2, L2=2, L3=2, Emax_brut=2, v=2, cap=1)) \
+    e[["lon", "lat", "x", "y", "E", "L1", "L2", "L3", "Emax_brut", "E_brut", "v", "cap", "sens", "heure_locale", "passage"]] \
+        .round(dict(lon=7, lat=7, x=2, y=2, E=2, L1=2, L2=2, L3=2, Emax_brut=2, E_brut=2, v=2, cap=1)) \
         .to_csv(out_dir / "mesures_pas2m.csv", index=False, sep=";", decimal=",")
     if not len(lum):
         return

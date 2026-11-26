@@ -22,7 +22,7 @@ Si un rapport existe déjà pour la même tournée, il est déplacé dans `rappo
 - `rapport.html` : rapport autonome. Il contient une carte zoomable, les lampadaires estimés, le type de lampe, la puissance et la consommation, la fiabilité des estimations, la qualité des mesures et l'abaissement nocturne.
 - `carte.html` : carte sur fond satellite. Calques : points chauds / froids, 3 capteurs filtrés par sens de passage, lampadaires estimés (par type ou par côté), tronçons à lampadaires des deux côtés. Le fond de carte demande une connexion internet.
 - `lampadaires_estimes.csv` / `.geojson` : un lampadaire par ligne, avec sa position, son côté, le type de lampe, la Tcp, la puissance et sa fourchette, et la consommation.
-- `mesures_pas2m.csv` : un point tous les 2 m roulés (lon/lat, Lambert 93, médiane et 3 capteurs, vitesse, cap, sens, heure).
+- `mesures_pas2m.csv` : un point tous les 2 m roulés (lon/lat, Lambert 93, médiane et 3 capteurs, signal brut avant filtrage `E_brut`, vitesse, cap, sens, heure).
 - `resume.json` : tous les indicateurs.
 
 ## Chaîne de traitement (≈ 6 s pour 3 h 20 de relevé)
@@ -51,4 +51,8 @@ Le dashboard lit `rapports/` et calcule à partir de `mesures_pas2m.csv` :
 - **Moyenne au tronçon** (`dashboard/troncons.py`) : filaire de voirie OpenStreetMap (cache dans `dashboard/voirie/`), coupé à chaque carrefour (parts de ~150 m au-delà de 250 m). Chaque mesure est rattachée au tronçon le plus proche (< 15 m) d'orientation compatible avec le cap. Moyenne **par sens de passage** (chaque passage pèse autant), puis **moyenne des deux sens**. Un tronçon à double sens mesuré dans un seul sens est signalé « à repasser ».
 - **Hexagones de 10 m** (`dashboard/hexagones.py`) : même règle, une moyenne par sens puis moyenne des deux sens.
 - **Conformité SDAL** : un seuil d'éclairement moyen par type de voie (principale, distribution, résidentielle, desserte), modifiable dans l'interface. Valeurs par défaut = hypothèses en attendant le SDAL de la commune.
-- **Street View** : clic sur la carte, le classement ou le tableau ; la vue s'oriente dans le sens de la tournée.
+- **Points chauds / froids** : même méthode et même palette (0 à 50 lx) que `carte.html` : valeur moyenne, rayon de 9 m quel que soit le zoom, filtre sens 1 / sens 2.
+- **Avant / après lissage du bruit** : toutes les vues peuvent être recalculées sur le signal brut (colonne `E_brut` de `mesures_pas2m.csv` : médiane des 3 capteurs, sans filtre de Hampel ni suppression des pics aberrants).
+- **Fond clair / sombre**, couches (lampadaires estimés) et sélection mis à jour sans recharger la carte : le zoom est conservé.
+- **Rues les plus en déficit** : classement par déficit cumulé (longueur × écart au seuil SDAL) ; un clic centre la carte sur le tronçon le plus sombre.
+- **Street View** : clic sur la carte, le classement, le tableau des tronçons ou les tronçons à fiabiliser (onglet Qualité) ; la carte se centre sur le tronçon surligné et la vue s'oriente dans le sens de la tournée.

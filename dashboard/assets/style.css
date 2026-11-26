@@ -129,3 +129,29 @@ body {
 .input-group-text { background: var(--surface-2); border-color: var(--bord); color: var(--texte-2); }
 .form-control { background: var(--fond); border-color: var(--bord); color: var(--texte); }
 .form-control:focus { background: var(--fond); color: var(--texte); border-color: var(--ambre); box-shadow: none; }
+
+/* --- barre d'outils de la carte */
+.barre-outils { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 16px; }
+.outil { display: flex; flex-direction: column; gap: 3px; }
+.outil-titre { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--texte-2); font-weight: 600; }
+.outil-couches { margin-left: auto; display: flex; flex-direction: column; gap: 2px; }
+.outil-couches .form-check { margin: 0; }
+.bandeau-lissage { background: rgba(245, 179, 1, 0.10); border-bottom: 1px solid rgba(245, 179, 1, 0.35);
+  color: #f3d27a; font-size: 0.8rem; padding: 6px 14px; }
+
+/* --- rues les plus en déficit */
+.liste-deficits { display: flex; flex-direction: column; gap: 6px; max-height: 470px; overflow-y: auto; padding-right: 4px; }
+.ligne-deficit { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: 28px 1fr auto;
+  gap: 10px; align-items: center; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--bord);
+  background: var(--surface-2); transition: border-color .15s, background .15s; width: 100%; }
+.ligne-deficit:hover, .ligne-deficit:focus-visible { border-color: var(--ambre); background: #222934; }
+.deficit-rang { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
+  font-size: 0.8rem; background: rgba(229, 72, 77, 0.15); color: #ff8c8f; }
+.deficit-nom { font-weight: 600; font-size: 0.9rem; color: var(--texte); }
+.deficit-detail { font-size: 0.75rem; color: var(--texte-2); margin: 2px 0 5px; }
+.deficit-barre { height: 4px; background: var(--bord); }
+.deficit-valeur { font-weight: 700; font-size: 1rem; font-variant-numeric: tabular-nums; }
+.deficit-seuil { font-size: 0.72rem; color: var(--texte-2); }
+.badge-type { font-size: 0.68rem; padding: 1px 7px; border-radius: 999px; background: var(--bord); color: var(--texte-2); }
+.badge-alerte { font-size: 0.68rem; padding: 1px 7px; border-radius: 999px; background: rgba(255, 159, 67, 0.15);
+  color: #ffb877; border: 1px solid rgba(255, 159, 67, 0.4); }
