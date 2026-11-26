@@ -10,6 +10,7 @@ La conformité (SDAL : un seuil d'éclairement moyen par type de voie) ne s'appl
 Chaque vue peut être affichée avant ou après le lissage du bruit (colonne E_brut de mesures_pas2m.csv).
 """
 import base64
+import gzip
 import json
 import math
 import os
@@ -25,7 +26,7 @@ import plotly.graph_objects as go
 import plotly.io as pio
 import requests
 from dash import ALL, ClientsideFunction, Input, Output, Patch, State, ctx, dash_table, dcc, html  # noqa: F401
-from flask import abort, send_from_directory
+from flask import Response, abort, request, send_from_directory
 from pyproj import Transformer
 from scipy.spatial import cKDTree
 
@@ -37,7 +38,19 @@ ICI = Path(__file__).resolve().parent
 RACINE = ICI.parent                           # racine du dépôt (getys_rapport.py, rapports/)
 SERVER_URL = os.environ.get("SERVER_URL", "http://localhost:5001/upload")   # serveur d'analyse (serveur.py)
 RAPPORTS_DIR = Path(os.environ.get("RAPPORTS_DIR", RACINE / "rapports"))     # sorties de getys_rapport.py
-FONDS = {"sombre": "carto-darkmatter", "clair": "carto-positron"}           # fonds de carte gratuits, sans clé
+FONDS = {"sombre": "carto-darkmatter", "clair": "carto-positron", "satellite": "white-bg"}   # gratuits, sans clé
+# Satellite : mêmes tuiles que carte.html (getys_rapport.py) : imagerie Esri + noms de lieux par-dessus
+ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/{}/MapServer/tile/{{z}}/{{y}}/{{x}}"
+COUCHES_SATELLITE = [
+    {"below": "traces", "sourcetype": "raster", "source": [ESRI.format("World_Imagery")],
+     "sourceattribution": "Imagerie © Esri, Maxar, Earthstar Geographics"},
+    {"below": "traces", "sourcetype": "raster", "source": [ESRI.format("Reference/World_Boundaries_and_Places")]},
+]
+
+
+def fond_carte(fond):
+    """(style MapLibre, couches raster, légende claire ?) pour un fond de carte."""
+    return FONDS[fond], (COUCHES_SATELLITE if fond == "satellite" else []), fond == "clair"
 VERT, ROUGE, ORANGE, AMBRE, CYAN = "#2fbf71", "#e5484d", "#ff9f43", "#f5b301", "#38d9f5"
 CARTE_H = 640
 ZOOM0 = 13.6
@@ -82,6 +95,7 @@ BARRE_COULEUR = dict(thickness=12, x=0.99, xanchor="right", len=0.55, bgcolor="r
                      tickfont=dict(color="#e6edf3"), title_font=dict(color="#e6edf3"))
 
 app = dash.Dash(__name__, title="Éclairage public", suppress_callback_exceptions=True,
+                compress=True,                    # réponses des callbacks compressées (flask-compress)
                 external_stylesheets=[dbc.themes.DARKLY, dbc.icons.BOOTSTRAP,
                                       "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"])
 
@@ -93,6 +107,35 @@ def servir_rapport(chemin):
     if not (racine / chemin).is_file():
         abort(404)
     return send_from_directory(racine, chemin)
+
+
+@app.server.route("/hexagones/<nom>/<variante>.geojson")
+def servir_hexagones(nom, variante):
+    """Géométrie des hexagones (≈ 10 Mo, 1,5 Mo compressée), servie à part de la figure : Plotly la
+    télécharge une fois (paramètre geojson = URL), le navigateur la garde en cache. La figure ne
+    transporte plus que les valeurs (id, lux, passages)."""
+    dossiers = {d.name: d for d in lister_rapports()}
+    if nom not in dossiers or variante not in ("lisse", "brut"):
+        abort(404)
+    d = dossiers[nom]
+    corps, etag = _hexagones_gz(str(d), d.stat().st_mtime, variante == "brut")
+    if request.headers.get("If-None-Match") == etag:
+        return Response(status=304)
+    rep = Response(corps, mimetype="application/geo+json")
+    rep.headers.update({"Content-Encoding": "gzip", "ETag": etag, "Vary": "Accept-Encoding",
+                        "Cache-Control": "public, max-age=86400, immutable"})   # l'URL change avec le rapport
+    return rep
+
+
+@lru_cache(maxsize=4)
+def _hexagones_gz(dossier, mtime, brut):
+    data = charger(dossier, brut=brut)
+    brut_json = json.dumps(data["hex"][0], separators=(",", ":")).encode()
+    return gzip.compress(brut_json, 6), f'"hex-{int(mtime)}-{int(brut)}"'
+
+
+def url_hexagones(data):
+    return f"/hexagones/{quote(data['nom'])}/{'brut' if data['brut'] else 'lisse'}.geojson?v={data['version']}"
 
 
 # ------------------------------------------------------------------ LECTURE DES SORTIES
@@ -130,7 +173,8 @@ def charger(dossier, brut=False):
 def _charger(dossier, _mtime):
     d = Path(dossier)
     sortie = {"resume": {}, "hex": None, "mesures": None, "supports": None, "luminaires": None,
-              "troncons": None, "geoms": None, "erreur_troncons": None, "arbre_pts": None, "brut": False}
+              "troncons": None, "geoms": None, "erreur_troncons": None, "arbre_pts": None, "brut": False,
+              "nom": d.name, "version": int(_mtime)}
     if (d / "resume.json").exists():
         sortie["resume"] = json.loads((d / "resume.json").read_text(encoding="utf-8"))
     if (d / "mesures_pas2m.csv").exists():
@@ -357,17 +401,16 @@ def carte(data, mode, couleur, couches, sdal, selection, fond, vue, uirev):
             fig.add_trace(t)
 
     elif mode == "hex" and data["hex"] is not None:
-        gj, p = data["hex"]
-        # survol léger (≈ 45 000 cellules) : [E sens 1, E sens 2, passages] ; le clic retrouve la cellule par son id
-        cd = p[["E_sens1", "E_sens2", "n_passages"]].astype(object)
-        cd = cd.where(cd.notna(), "–").values
+        _, p = data["hex"]
+        # géométrie par URL (téléchargée une fois, en cache) ; valeurs en tableaux binaires (int32 / float32)
         fig.add_trace(go.Choroplethmap(
-            geojson=gj, locations=p["_id"], z=p["E_moy"].clip(0, LUX_MAX), colorscale=ECHELLE,
-            zmin=0, zmax=LUX_MAX, marker_line_width=0.4, marker_line_color="rgba(110,115,125,0.7)",
-            marker_opacity=0.95, colorbar=dict(title="lux", **BARRE_COULEUR), customdata=cd,
-            name="Hexagones de 2 m",
-            hovertemplate="<b>%{z:.1f} lx</b> (moyenne des deux sens)<br>sens 1 : %{customdata[0]} lx · "
-                          "sens 2 : %{customdata[1]} lx<br>%{customdata[2]} passage(s)<extra></extra>"))
+            geojson=url_hexagones(data), locations=p["_id"].to_numpy(np.int32),
+            z=p["E_moy"].clip(0, LUX_MAX).to_numpy(np.float32), customdata=p["n_passages"].to_numpy(np.int16),
+            colorscale=ECHELLE, zmin=0, zmax=LUX_MAX, marker_line_width=0.4,
+            marker_line_color="rgba(110,115,125,0.7)", marker_opacity=0.95,
+            colorbar=dict(title="lux", **BARRE_COULEUR), name="Hexagones de 2 m",
+            hovertemplate="<b>%{z:.1f} lx</b> (moyenne des deux sens)<br>%{customdata} passage(s)"
+                          "<br><i>clic : détail par sens</i><extra></extra>"))
 
     elif mode == "points":
         meta["points"] = [len(fig.data)]
@@ -419,9 +462,9 @@ def carte(data, mode, couleur, couches, sdal, selection, fond, vue, uirev):
                                 mode="markers", name="Point Street View", showlegend=False, hoverinfo="skip",
                                 marker=dict(size=18, color=CYAN, opacity=0.95)))
 
-    clair = fond == "clair"
+    style, couches_fond, clair = fond_carte(fond)
     centre = vue.get("center") or {"lat": m["lat"].mean(), "lon": m["lon"].mean()}
-    fig.update_layout(map=dict(style=FONDS[fond], center=centre, zoom=zoom),   # vue courante : pas de saut
+    fig.update_layout(map=dict(style=style, layers=couches_fond, center=centre, zoom=zoom),   # vue courante
                       margin=dict(l=0, r=0, t=0, b=0), height=CARTE_H, uirevision=uirev or "carte",
                       showlegend=True,
                       legend=dict(x=0.01, y=0.99, bgcolor="rgba(255,255,255,0.88)" if clair else "rgba(13,17,23,0.8)",
@@ -661,6 +704,7 @@ champs_sdal = [
 app.layout = html.Div(className="page", children=[
     dcc.Store(id="selection"), dcc.Store(id="carte-meta"), dcc.Store(id="vue", data={}),
     dcc.Store(id="uirev", data="carte"), html.Div(id="defilement", hidden=True),
+    dcc.Store(id="url-hex"), html.Div(id="prechargement", hidden=True),
     # --- barre du haut
     html.Header(className="entete", children=dbc.Container(fluid=True, children=dbc.Row(
         align="center", className="g-2", children=[
@@ -706,7 +750,9 @@ app.layout = html.Div(className="page", children=[
                         "Bruit"),
                     segmente("fond", "sombre", [
                         {"label": [html.I(className="bi bi-moon-stars me-1"), "Sombre"], "value": "sombre"},
-                        {"label": [html.I(className="bi bi-sun me-1"), "Clair"], "value": "clair"}], "Fond"),
+                        {"label": [html.I(className="bi bi-sun me-1"), "Clair"], "value": "clair"},
+                        {"label": [html.I(className="bi bi-globe-europe-africa me-1"), "Satellite"],
+                         "value": "satellite"}], "Fond"),
                     dbc.Checklist(id="couches", value=[], switch=True, className="small outil-couches",
                                   options=[{"label": "Lampadaires estimés", "value": "lum"},
                                            {"label": "Supports suspects", "value": "sus"}]),
@@ -853,10 +899,10 @@ def envoyer(n_lancer, contenu, nom, actuel):
 
 
 @app.callback(Output("lien-rapport", "href"), Output("lien-rapport", "className"),
-              Output("lien-carte", "href"), Output("lien-carte", "className"),
+              Output("lien-carte", "href"), Output("lien-carte", "className"), Output("url-hex", "data"),
               Input("choix-rapport", "value"))
 def liens_rapport(dossier):
-    """Liens vers rapport.html et carte.html produits par getys_rapport.py."""
+    """Liens vers rapport.html et carte.html produits par getys_rapport.py + URL des hexagones à précharger."""
     classe = "btn btn-outline-light btn-sm"
     sortie = []
     for f in ("rapport.html", "carte.html"):
@@ -864,7 +910,16 @@ def liens_rapport(dossier):
             sortie += [f"/rapport/{Path(dossier).name}/{f}", classe]
         else:
             sortie += [None, classe + " disabled"]
-    return sortie
+    return sortie + [url_hexagones(charger(dossier)) if dossier else None]
+
+
+# géométrie des hexagones téléchargée en arrière-plan : la vue Hexagones s'ouvre sans attente
+app.clientside_callback(
+    """function(url) {
+        if (url) { setTimeout(() => fetch(url).catch(() => null), 1500); }
+        return '';
+    }""",
+    Output("prechargement", "children"), Input("url-hex", "data"))
 
 
 ONGLETS = {"troncons": "tableau", "distrib": "p-distrib", "lampes": "p-lampes", "chrono": "p-chrono",
@@ -986,9 +1041,10 @@ def options_couleur(mode, valeur):
 
 @app.callback(Output("carte", "figure", allow_duplicate=True), Input("fond", "value"), prevent_initial_call=True)
 def changer_fond(fond):
-    clair = fond == "clair"
+    style, couches_fond, clair = fond_carte(fond)
     p = Patch()
-    p["layout"]["map"]["style"] = FONDS[fond]
+    p["layout"]["map"]["style"] = style
+    p["layout"]["map"]["layers"] = couches_fond
     p["layout"]["legend"]["bgcolor"] = "rgba(255,255,255,0.88)" if clair else "rgba(13,17,23,0.8)"
     p["layout"]["legend"]["bordercolor"] = "#c9ced6" if clair else "#30363d"
     p["layout"]["legend"]["font"]["color"] = "#1f2328" if clair else "#e6edf3"
@@ -1092,7 +1148,7 @@ def choisir_point(clic_carte, clics_deficit, cellule, cellule_q, dossier):
         elif isinstance(cd, list) and len(cd) == 8 and cd[7] == "lampe":          # lampadaire estimé
             sel.update(titre=f"💡 Lampadaire estimé — {cd[0]}",
                        detail=f"{cd[1]:.0f} W estimés · côté {cd[4]} · pic {cd[5]:.0f} lx")
-        elif hexa is None and isinstance(cd, list) and len(cd) == 3:               # point chaud / froid
+        elif isinstance(cd, list) and len(cd) == 3:                                # point chaud / froid
             sel.update(titre="Point de mesure", detail=f"{float(cd[0]):.1f} lx · sens {cd[1]} · {cd[2]}")
         elif hexa is not None:                                                     # hexagone
             sel.update(titre="Hexagone de 2 m", detail=f"{fmt(hexa['E_moy'], ' lx')} (sens 1 : "
