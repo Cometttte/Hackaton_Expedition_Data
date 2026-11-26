@@ -35,6 +35,26 @@ window.getys = Object.assign({}, window.getys, (function () {
         const seuil = s == null ? p.sd : s;
         return {seuil, conforme: p.E >= seuil, incomplet: p.ns < 2 && !p.su};
     }
+    // --- taille des points chauds / froids selon le zoom
+    const POINTS = [];
+    let zoomSuivi = false;
+    function rayonPoints() {
+        const m = window.getysCarte;
+        if (!m) return 3;
+        const mpp = 40075016.686 * Math.cos(m.getCenter().lat * Math.PI / 180) / Math.pow(2, m.getZoom() + 8);
+        return Math.max(2, Math.min(9, 9 / mpp));      // 9 m au sol, entre 2 et 9 px de rayon
+    }
+    function suivreZoom() {
+        const m = window.getysCarte;
+        if (zoomSuivi || !m) return;
+        zoomSuivi = true;
+        m.on('zoomend', () => {
+            const r = rayonPoints();
+            let j = 0;
+            for (const c of POINTS) { if (c._map) { c.setRadius(r); POINTS[j++] = c; } }   // oublie les retirés
+            POINTS.length = j;
+        });
+    }
     // rendu canvas avec une tolérance de clic de 6 px : inutile de viser pile le trait de 4 px
     let rendu = null;
     const renduTolerant = () => rendu || (rendu = L.canvas({tolerance: 6, padding: 0.5}));
@@ -74,10 +94,14 @@ window.getys = Object.assign({}, window.getys, (function () {
                     color: 'rgba(110,115,125,0.7)', weight: 0.4, smoothFactor: 0};
         },
         infoHex: function (feature, layer) { retenirClic(feature, layer); },
-        // points chauds / froids : cercle de 9 m de rayon (en mètres, donc constant au sol quel que soit le zoom)
+        // points chauds / froids, comme carte.html : rayon de 9 m converti en pixels, borné, recalculé à chaque zoom
+        // (un cercle en mètres grossit sans fin quand on zoome)
         pointChaud: function (feature, latlng) {
-            return L.circle(latlng, {radius: 9, stroke: false, fillColor: rgb(feature.properties.E),
-                                     fillOpacity: 0.55, interactive: true});
+            const c = L.circleMarker(latlng, {radius: rayonPoints(), stroke: false, interactive: true,
+                                              fillColor: rgb(feature.properties.E), fillOpacity: 0.6});
+            POINTS.push(c);
+            suivreZoom();
+            return c;
         },
         lampe: function (feature, latlng) {
             const p = feature.properties;

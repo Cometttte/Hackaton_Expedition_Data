@@ -18,7 +18,7 @@ import math
 import os
 from functools import lru_cache
 from pathlib import Path
-from urllib.parse import quote, unquote
+from urllib.parse import quote
 
 import dash
 import dash_bootstrap_components as dbc
@@ -350,15 +350,6 @@ def point_le_plus_sombre(data, *tids):
     return float(p["lat"]), float(p["lon"]), float(p.get("cap", 0) or 0), float(p["lux_lisse"])
 
 
-def zoom_pour(lats, lons, largeur_px=820, hauteur_px=CARTE_H):
-    """Zoom MapLibre qui fait tenir l'emprise (avec une marge) dans la carte."""
-    lat0 = float(np.mean(lats))
-    dx = (max(lons) - min(lons)) * 111320 * math.cos(math.radians(lat0))
-    dy = (max(lats) - min(lats)) * 110540
-    mpp = max(dx / largeur_px, dy / hauteur_px, 0.15) * 1.35
-    return float(np.clip(math.log2(40075016.686 * math.cos(math.radians(lat0)) / (mpp * 512)), 12.5, 17.5))
-
-
 def cap_proche(data, lat, lon):
     """Cap du véhicule à la mesure la plus proche (oriente Street View dans le sens de la rue)."""
     if data["mesures"] is None:
@@ -427,52 +418,6 @@ VIDE = {"type": "FeatureCollection", "features": []}
 
 
 # ------------------------------------------------------------------ PANNEAUX
-def deficits_par_rue(tr, n=12):
-    """Rues classées par déficit cumulé : Σ longueur × (1 − E/seuil) sur leurs tronçons non conformes.
-    Chaque ligne renvoie sur le tronçon le plus sombre de la rue."""
-    if tr is None or tr.empty:
-        return html.P("Pas de tronçons.", className="text-muted")
-    t = tr.assign(manque=(1 - tr["ratio"]).clip(lower=0), lg_nc=tr["longueur_m"].where(~tr["conforme"], 0),
-                  e_lg=tr["E_moy"] * tr["longueur_m"], s_lg=tr["seuil"] * tr["longueur_m"])
-    t["score"] = t["manque"] * t["longueur_m"]
-    g = t.groupby("nom").agg(score=("score", "sum"), lg=("longueur_m", "sum"), lg_nc=("lg_nc", "sum"),
-                             e_lg=("e_lg", "sum"), s_lg=("s_lg", "sum"), n=("id", "size"),
-                             n_nc=("conforme", lambda c: int((~c).sum())),
-                             incomplet=("a_completer", "any"), classe=("classe", lambda c: c.mode().iat[0]))
-    g["E"] = g["e_lg"] / g["lg"]
-    g["S"] = g["s_lg"] / g["lg"]
-    g = g[g["lg_nc"] > 0].sort_values("score", ascending=False).head(n)
-    if g.empty:
-        return dbc.Alert([html.I(className="bi bi-check-circle me-2"), "Toutes les rues respectent leur seuil SDAL."],
-                         color="success", className="mb-0")
-    lignes = []
-    for rang, (nom, r) in enumerate(g.iterrows(), 1):
-        pct = float(min(100, 100 * r["E"] / r["S"])) if r["S"] else 0
-        coul = "danger" if pct < 50 else "warning" if pct < 100 else "success"
-        # id ASCII : avec des accents, Dash ne retrouve pas la valeur du bouton cliqué (ctx.triggered)
-        lignes.append(html.Button(id={"type": "deficit", "index": quote(str(nom))}, n_clicks=0,
-                                  className="ligne-deficit", children=[
-            html.Div(f"{rang}", className="deficit-rang"),
-            html.Div(className="deficit-corps", children=[
-                html.Div([html.Span(nom, className="deficit-nom"),
-                          html.Span(T.CLASSES[r["classe"]][0], className="badge-type"),
-                          html.Span([html.I(className="bi bi-arrow-left-right me-1"), "1 sens"],
-                                    className="badge-alerte") if r["incomplet"] else None],
-                         className="d-flex align-items-center gap-2 flex-wrap"),
-                html.Div(f"{fmt(r['lg_nc'], ' m', 0)} sous le seuil sur {fmt(r['lg'], ' m', 0)} · "
-                         f"{r['n_nc']} / {r['n']} tronçon(s)", className="deficit-detail"),
-                dbc.Progress(value=pct, color=coul, className="deficit-barre"),
-            ]),
-            html.Div([html.Div(fmt(r["E"], " lx"), className=f"deficit-valeur text-{coul}"),
-                      html.Div(f"seuil {fmt(r['S'], ' lx')}", className="deficit-seuil")], className="text-end"),
-        ]))
-    return html.Div([
-        html.Div("Classement par déficit cumulé (longueur × écart au seuil). Cliquez une rue : la carte "
-                 "la cadre en entier et surligne tous ses tronçons.", className="small text-muted mb-2"),
-        html.Div(lignes, className="liste-deficits"),
-    ])
-
-
 def distribution(tr):
     """E moyen des tronçons par type de voie, avec le seuil SDAL de chaque type."""
     if tr is None or tr.empty:
@@ -733,7 +678,7 @@ app.layout = html.Div(className="page", children=[
                     html.Div(id="legende", className="legende-carte"),
                 ]), className="p-0"),
                 dbc.CardFooter([html.I(className="bi bi-cursor me-2"),
-                                "Cliquez sur la carte, une rue du classement ou une ligne d'un tableau : "
+                                "Cliquez sur la carte ou sur une ligne d'un tableau : "
                                 "la carte va sur le tronçon et Street View s'affiche à droite."],
                                className="small text-muted"),
             ])),
@@ -757,9 +702,7 @@ app.layout = html.Div(className="page", children=[
         ]),
 
         dbc.Row(className="g-3 mt-0", children=[
-            dbc.Col(xl=5, children=carte_bloc("Rues les plus en déficit", "sort-down",
-                                              html.Div(id="deficits"))),
-            dbc.Col(xl=7, children=dbc.Card(className="bloc h-100", children=[
+            dbc.Col(xs=12, children=dbc.Card(className="bloc h-100", children=[
                 dbc.CardHeader(dbc.Tabs(id="onglets", active_tab="troncons", className="card-header-tabs", children=[
                     dbc.Tab(label="Tronçons", tab_id="troncons"),
                     dbc.Tab(label="Par type de voie", tab_id="distrib"),
@@ -909,7 +852,7 @@ def changer_onglet(onglet):
 
 
 # ------------------------------------------------------------------ CALLBACKS : AFFICHAGE
-@app.callback(Output("contexte", "children"), Output("kpis", "children"), Output("deficits", "children"),
+@app.callback(Output("contexte", "children"), Output("kpis", "children"),
               Output("distrib", "figure"), Output("lampes", "figure"), Output("chrono", "figure"),
               Output("tableau", "children"), Output("qualite", "children"),
               Input("choix-rapport", "value"), *SDAL_INPUTS)
@@ -958,7 +901,7 @@ def afficher(dossier, *valeurs):
         kpis.append(kpi("lightbulb", "Lampadaires estimés", fmt(k["n_lampadaires"], dec=0),
                         f"{fmt(k.get('puissance_tot_kw'), ' kW')} installés", "info"))
 
-    return ([contexte, alerte], kpis, deficits_par_rue(tr), distribution(tr), types_lampes(data),
+    return ([contexte, alerte], kpis, distribution(tr), types_lampes(data),
             chronologie(data), tableau_troncons(tr), qualite(data, tr))
 
 
@@ -979,20 +922,13 @@ def afficher_calques(dossier, mode, lissage):
     sortie = []
     for m, couche in (("troncons", "troncons"), ("hex", "hexagones"), ("points", "points")):
         sortie += [url_couche(data, couche), None] if mode == m else [None, VIDE]
-    bandeau = []
-    if mode == "hex":
-        bandeau.append(html.Div([html.I(className="bi bi-zoom-in me-2"),
-                                 "Hexagones de 2 m : bande continue le long du trajet (3 luxmètres à ±0,49 m). "
-                                 "Zoomez sur un quartier pour les distinguer."], className="bandeau-lissage"))
+    bandeau = []                                   # messages d'erreur uniquement
     if mode == "troncons" and data["troncons"] is None:
         bandeau.append(html.Div("Filaire de voirie indisponible (réseau ?) : " + (data["erreur_troncons"] or ""),
                                 className="bandeau-lissage"))
-    if brut:
-        texte = ("Avant lissage : signal brut (médiane des 3 capteurs, sans filtre de Hampel ni suppression des pics "
-                 "aberrants). Comparez avec « Après lissage ».")
-        if not data["brut"]:
-            texte = "Ce rapport ne contient pas le signal brut (colonne E_brut) : relancez l'analyse pour l'obtenir."
-        bandeau.append(html.Div([html.I(className="bi bi-soundwave me-2"), texte], className="bandeau-lissage"))
+    if brut and not data["brut"]:
+        bandeau.append(html.Div([html.I(className="bi bi-soundwave me-2"), "Ce rapport ne contient pas le signal "
+                                 "brut (colonne E_brut) : relancez l'analyse pour l'obtenir."], className="bandeau-lissage"))
     return (*sortie, bandeau or None)
 
 
@@ -1064,41 +1000,18 @@ def _selection_troncon(data, tid, titre_extra=None):
             "zoom": 18.0 if lg < 80 else 17.5 if lg < 180 else 17.0}
 
 
-def _selection_rue(data, nom):
-    """Toute la rue : tronçons surlignés, carte cadrée sur la rue, Street View au point le plus sombre."""
-    tr = data["troncons"]
-    rue = tr[tr["nom"] == nom]
-    if rue.empty:
-        return dash.no_update
-    tr_lat, tr_lon = [], []
-    for tid in rue["id"]:
-        glon, glat = data["geoms"][tid]
-        tr_lat += list(glat) + [None]; tr_lon += list(glon) + [None]
-    lats = [v for v in tr_lat if v is not None]
-    lons = [v for v in tr_lon if v is not None]
-    lat, lon, cap, e_min = point_le_plus_sombre(data, *rue["id"])
-    lg = float(rue["longueur_m"].sum())
-    e = float((rue["E_moy"] * rue["longueur_m"]).sum() / lg)
-    return {"lat": lat, "lon": lon, "cap": cap, "titre": nom, "centrer": True, "tid": f"rue:{nom}",
-            "detail": f"rue entière : {len(rue)} tronçon(s) · {fmt(lg, ' m', 0)} · E moyen {fmt(e, ' lx')} · "
-                      f"Street View au point le plus sombre ({fmt(e_min, ' lx')})",
-            "tr_lat": tr_lat, "tr_lon": tr_lon,
-            "c_lat": (min(lats) + max(lats)) / 2, "c_lon": (min(lons) + max(lons)) / 2,
-            "zoom": zoom_pour(lats, lons) + 1}
-
-
 @app.callback(Output("selection", "data"),
               Input("geo-troncons", "clickData"), Input("geo-hex", "clickData"), Input("geo-points", "clickData"),
-              Input("geo-lampes", "clickData"), Input({"type": "deficit", "index": ALL}, "n_clicks"),
+              Input("geo-lampes", "clickData"),
               Input("table-troncons", "active_cell"), Input("table-qualite", "active_cell"),
               State("choix-rapport", "value"), prevent_initial_call=True)
-def choisir_point(clic_tr, clic_hex, clic_pt, clic_lampe, clics_deficit, cellule, cellule_q, dossier):
+def choisir_point(clic_tr, clic_hex, clic_pt, clic_lampe, cellule, cellule_q, dossier):
     if not dossier:
         return dash.no_update
     data = charger(dossier)
     src = ctx.triggered_id
     clics = {"geo-troncons": clic_tr, "geo-hex": clic_hex, "geo-points": clic_pt, "geo-lampes": clic_lampe}
-    clic = clics.get(src) if isinstance(src, str) else None       # src est un dict pour la liste des déficits
+    clic = clics.get(src) if isinstance(src, str) else None
     if clic:
         p, geo = clic.get("properties") or {}, clic.get("geometry") or {}
         if p.get("_lat") is not None:                         # point exact du clic (mémorisé côté navigateur)
@@ -1128,13 +1041,7 @@ def choisir_point(clic_tr, clic_hex, clic_pt, clic_lampe, clics_deficit, cellule
                                                        f"sens 2 : {fmt(p.get('s2'), ' lx')}) · {p.get('np')} passage(s)")
         return sel
     tid, extra = None, None
-    if isinstance(src, dict) and src.get("type") == "deficit":
-        if not ctx.triggered or not ctx.triggered[0]["value"]:      # liste redessinée, pas un clic
-            return dash.no_update
-        if data["troncons"] is None:
-            return dash.no_update
-        return _selection_rue(data, unquote(src["index"]))
-    elif src == "table-troncons" and cellule:
+    if src == "table-troncons" and cellule:
         tid = cellule.get("row_id")
     elif src == "table-qualite" and cellule_q and cellule_q.get("row_id"):
         tid = cellule_q["row_id"].split("|")[0]
