@@ -41,6 +41,7 @@ ICI = Path(__file__).resolve().parent
 RACINE = ICI.parent                           # racine du dépôt (getys_rapport.py, rapports/)
 SERVER_URL = os.environ.get("SERVER_URL", "http://localhost:5001/upload")   # serveur d'analyse (serveur.py)
 RAPPORTS_DIR = Path(os.environ.get("RAPPORTS_DIR", RACINE / "rapports"))     # sorties de getys_rapport.py
+LIEN_HACKATHON = "https://www.bouygues-es.fr"                                # Hackathon 2026 Bouygues E&S
 # Fonds de carte (tuiles raster, gratuites, sans clé). Satellite : mêmes tuiles que carte.html (getys_rapport.py)
 ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/{}/MapServer/tile/{{z}}/{{y}}/{{x}}"
 ATTR_ESRI = "© Esri, HERE, Garmin, © OpenStreetMap contributors"
@@ -365,7 +366,7 @@ def kpi(icone, titre, valeur, detail=None, couleur="light", barre=None):
         corps.append(dbc.Progress(value=barre, color=couleur, className="kpi-barre"))
     if detail:
         corps.append(html.Div(detail, className="kpi-detail"))
-    return dbc.Col(html.Div(corps, className="kpi"), xs=6, md=4, xl=2)
+    return dbc.Col(html.Div(corps, className="kpi"), xs=6, xl=3)
 
 
 def carte_vide(msg, h=CARTE_H):
@@ -649,9 +650,17 @@ app.layout = html.Div(className="page", children=[
     html.Header(className="entete", children=dbc.Container(fluid=True, children=dbc.Row(
         align="center", className="g-2", children=[
             dbc.Col(xs=12, lg=True, children=html.Div([
-                html.Div(html.I(className="bi bi-lightbulb-fill"), className="logo"),
+                # logo officiel (repris du dossier du hackathon, Getys_Hackathon.pdf)
+                html.A(html.Img(src=app.get_asset_url("logo-bouygues-es.png"), alt="Bouygues Energies & Services"),
+                       href=LIEN_HACKATHON, target="_blank", rel="noopener", className="logo-entreprise",
+                       title="Bouygues Energies & Services"),
                 html.Div([html.H1("Clair-Obscur", className="titre mb-0"),
-                          html.Div("Tableau de bord de l'éclairage public · relevés GETYS", className="sous-titre")]),
+                          html.Div(["Tableau de bord de l'éclairage public · ",
+                                    html.A([html.I(className="bi bi-trophy-fill me-1"), "Hackathon 2026 ",
+                                            html.I(className="bi bi-box-arrow-up-right")],
+                                           href=LIEN_HACKATHON, target="_blank", rel="noopener",
+                                           className="lien-hackathon"),
+                                    " · équipe ", html.B("Clair-Obscur")], className="sous-titre")]),
             ], className="d-flex align-items-center gap-3")),
             dbc.Col(xs=12, md=6, lg=4, children=dcc.Dropdown(
                 id="choix-rapport", clearable=False, placeholder="Choisir une tournée…",
@@ -758,8 +767,10 @@ app.layout = html.Div(className="page", children=[
                 ]),
             ])),
         ]),
-        html.Footer("Hackathon 2026 — mesures GETYS · lampadaires estimés et palette de carte.html "
-                    "(getys_rapport.py) · filaire © contributeurs OpenStreetMap", className="pied"),
+        html.Footer([html.A("Hackathon 2026 Bouygues Energies & Services", href=LIEN_HACKATHON, target="_blank",
+                            rel="noopener"), " · équipe Clair-Obscur · mesures GETYS · lampadaires estimés et "
+                     "palette de carte.html (getys_rapport.py) · filaire © contributeurs OpenStreetMap"],
+                    className="pied"),
     ]),
 
     # --- envoi d'une nouvelle tournée
@@ -922,13 +933,9 @@ def afficher(dossier, *valeurs):
     kpis = []
     if tr is not None and not tr.empty:
         lg = tr["longueur_m"]
-        e_res = float((tr["E_moy"] * lg).sum() / lg.sum())
         part_lin = float(100 * lg[tr["conforme"]].sum() / lg.sum())
         n_conf = int(tr["conforme"].sum())
-        n_comp = int(tr["a_completer"].sum())
         kpis += [
-            kpi("brightness-high", "Éclairement moyen", fmt(e_res, " lx"),
-                "moyenne des tronçons, pondérée par la longueur", "warning"),
             kpi("rulers", "Linéaire conforme", fmt(part_lin, " %", 0),
                 f"{fmt(lg[tr['conforme']].sum() / 1000, ' km')} sur {fmt(lg.sum() / 1000, ' km')}",
                 coul(part_lin), barre=part_lin),
@@ -941,9 +948,6 @@ def afficher(dossier, *valeurs):
     if k.get("n_lampadaires"):
         kpis.append(kpi("lightbulb", "Lampadaires estimés", fmt(k["n_lampadaires"], dec=0),
                         f"{fmt(k.get('puissance_tot_kw'), ' kW')} installés", "info"))
-    if tr is not None and not tr.empty:
-        kpis.append(kpi("arrow-left-right", "À repasser", f"{n_comp}",
-                        "tronçons à double sens mesurés dans un seul sens", "warning" if n_comp else "success"))
 
     return ([contexte, alerte], kpis, deficits_par_rue(tr), distribution(tr), types_lampes(data),
             chronologie(data), tableau_troncons(tr), qualite(data, tr))

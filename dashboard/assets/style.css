@@ -200,3 +200,13 @@ a { color: var(--bes-bleu); }
 .leaflet-tooltip-right:before { display: none; }
 .leaflet-control-attribution { font-size: 10px; }
 .leaflet-bar a { color: var(--bes-marine); }
+
+/* --- logo entreprise et lien hackathon (en-tête) */
+.logo-entreprise { display: grid; place-items: center; background: #FFFFFF; border-radius: 8px; padding: 4px 8px;
+  height: 48px; flex-shrink: 0; }
+.logo-entreprise img { height: 40px; width: auto; display: block; }
+.lien-hackathon { color: #FFFFFF; font-weight: 700; text-decoration: none; border-bottom: 1px solid var(--bes-orange); }
+.lien-hackathon:hover { color: var(--bes-bleu-clair); }
+.lien-hackathon .bi-trophy-fill { color: var(--bes-jaune); }
+.sous-titre b { color: #FFFFFF; }
+.pied a { color: var(--bes-bleu); font-weight: 600; }
