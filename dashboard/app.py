@@ -2,7 +2,8 @@
 
 Trois lectures des mesures (cf. cahier des charges GETYS) :
   * Moyenne au tronçon : filaire OSM, une moyenne par sens de circulation puis moyenne des deux sens
-  * Hexagones de 1 m   : statistiques par cellule, multi-passages, même règle par sens
+  * Hexagones de 2 m   : bande continue le long du trajet (3 luxmètres décalés latéralement, comme
+    getys_spatialisation.py), multi-passages, même règle par sens
   * Points chauds / froids : valeur moyenne autour de chaque point (méthode de carte.html, getys_rapport.py),
     rayon fixe en mètres quel que soit le zoom
 La conformité (SDAL : un seuil d'éclairement moyen par type de voie) ne s'applique qu'aux tronçons.
@@ -153,7 +154,7 @@ def _charger(dossier, _mtime):
         except Exception as e:                           # pas de réseau / Overpass indisponible
             sortie["erreur_troncons"] = str(e)
 
-    # --- hexagones de 1 m : une moyenne par sens de passage, puis moyenne des deux sens
+    # --- hexagones de 2 m : une moyenne par sens de passage, puis moyenne des deux sens
     if sortie["mesures"] is not None:
         sortie["hex"] = H.calculer(sortie["mesures"])
     if (d / "supports.csv").exists():
@@ -177,7 +178,9 @@ def _charger(dossier, _mtime):
 def _charger_brut(dossier, mtime):
     """Variante « avant lissage » : tronçons et hexagones recalculés sur E_brut (même filaire)."""
     base = _charger(dossier, mtime)
-    m = base["mesures"].assign(lux=base["mesures"]["lux_brut"])
+    brut = base["mesures"]["lux_brut"]
+    # pas de signal brut par capteur : le brut (médiane des 3) est placé aux 3 positions de luxmètre
+    m = base["mesures"].assign(lux=brut, L1=brut, L2=brut, L3=brut)
     sortie = {**base, "mesures": m, "brut": True}
     if base["troncons"] is not None:
         tr, geoms, _ = T.calculer(m, T.charger_voirie(m["lat"], m["lon"]))
@@ -355,16 +358,16 @@ def carte(data, mode, couleur, couches, sdal, selection, fond, vue, uirev):
 
     elif mode == "hex" and data["hex"] is not None:
         gj, p = data["hex"]
-        # 6 champs : [E moy, E sens 1, E sens 2, passages, lat, lon] (pas de -> carte trop lourde à 1 m)
-        cd = p[["E_moy", "E_sens1", "E_sens2", "n_passages", "_lat", "_lon"]].round(
-            {"E_moy": 1, "E_sens1": 1, "E_sens2": 1, "_lat": 6, "_lon": 6}).astype(object)
-        cd = cd.where(cd.notna(), None).values
+        # survol léger (≈ 45 000 cellules) : [E sens 1, E sens 2, passages] ; le clic retrouve la cellule par son id
+        cd = p[["E_sens1", "E_sens2", "n_passages"]].astype(object)
+        cd = cd.where(cd.notna(), "–").values
         fig.add_trace(go.Choroplethmap(
-            geojson=gj, locations=p["_id"], z=p["E_moy"].clip(0, LUX_MAX).round(1), colorscale=ECHELLE,
-            zmin=0, zmax=LUX_MAX, marker_line_width=0, marker_opacity=0.95,
-            colorbar=dict(title="lux", **BARRE_COULEUR), customdata=cd, name="Hexagones de 1 m",
-            hovertemplate="<b>%{customdata[0]} lx</b> (moyenne des deux sens)<br>sens 1 : %{customdata[1]} lx · "
-                          "sens 2 : %{customdata[2]} lx<br>%{customdata[3]} passage(s)<extra></extra>"))
+            geojson=gj, locations=p["_id"], z=p["E_moy"].clip(0, LUX_MAX), colorscale=ECHELLE,
+            zmin=0, zmax=LUX_MAX, marker_line_width=0.4, marker_line_color="rgba(110,115,125,0.7)",
+            marker_opacity=0.95, colorbar=dict(title="lux", **BARRE_COULEUR), customdata=cd,
+            name="Hexagones de 2 m",
+            hovertemplate="<b>%{z:.1f} lx</b> (moyenne des deux sens)<br>sens 1 : %{customdata[0]} lx · "
+                          "sens 2 : %{customdata[1]} lx<br>%{customdata[2]} passage(s)<extra></extra>"))
 
     elif mode == "points":
         meta["points"] = [len(fig.data)]
@@ -960,9 +963,8 @@ def afficher_carte(dossier, mode, couleur, lissage, *reste):
     bandeau = []
     if mode == "hex":
         bandeau.append(html.Div([html.I(className="bi bi-zoom-in me-2"),
-                                 "Hexagones de 1 m : zoomez sur une rue pour les voir (une mesure tous les 2 m, "
-                                 "d'où les cellules espacées). Pour une vue d'ensemble : « Tronçons » ou "
-                                 "« Points chauds / froids »."], className="bandeau-lissage"))
+                                 "Hexagones de 2 m : bande continue le long du trajet (3 luxmètres à ±0,49 m). "
+                                 "Zoomez sur un quartier pour les distinguer."], className="bandeau-lissage"))
     if brut:
         texte = ("Avant lissage : signal brut (médiane des 3 capteurs, sans filtre de Hampel ni suppression des pics "
                  "aberrants). Comparez avec « Après lissage ».")
@@ -1074,10 +1076,12 @@ def choisir_point(clic_carte, clics_deficit, cellule, cellule_q, dossier):
     if src == "carte" and clic_carte:
         pt = clic_carte["points"][0]
         cd = pt.get("customdata")
+        hexa = None
         if "lat" in pt and pt["lat"] is not None:
             lat, lon = pt["lat"], pt["lon"]
-        elif cd and len(cd) == 6:                          # hexagone : centre dans customdata
-            lat, lon = float(cd[4]), float(cd[5])
+        elif pt.get("location") is not None and data["hex"] is not None:      # hexagone : retrouvé par id
+            hexa = data["hex"][1].iloc[int(pt["location"])]
+            lat, lon = float(hexa["_lat"]), float(hexa["_lon"])
         else:
             return dash.no_update
         sel = {"lat": lat, "lon": lon, "cap": cap_proche(data, lat, lon), "titre": "Point sélectionné",
@@ -1088,11 +1092,12 @@ def choisir_point(clic_carte, clics_deficit, cellule, cellule_q, dossier):
         elif isinstance(cd, list) and len(cd) == 8 and cd[7] == "lampe":          # lampadaire estimé
             sel.update(titre=f"💡 Lampadaire estimé — {cd[0]}",
                        detail=f"{cd[1]:.0f} W estimés · côté {cd[4]} · pic {cd[5]:.0f} lx")
-        elif isinstance(cd, list) and len(cd) == 3:                                # point chaud / froid
+        elif hexa is None and isinstance(cd, list) and len(cd) == 3:               # point chaud / froid
             sel.update(titre="Point de mesure", detail=f"{float(cd[0]):.1f} lx · sens {cd[1]} · {cd[2]}")
-        elif "lat" not in pt and isinstance(cd, list) and len(cd) == 6:            # hexagone
-            sel.update(titre="Hexagone de 1 m", detail=f"{fmt(cd[0], ' lx')} (sens 1 : {fmt(cd[1], ' lx')}, "
-                                                      f"sens 2 : {fmt(cd[2], ' lx')}) · {cd[3]} passage(s)")
+        elif hexa is not None:                                                     # hexagone
+            sel.update(titre="Hexagone de 2 m", detail=f"{fmt(hexa['E_moy'], ' lx')} (sens 1 : "
+                       f"{fmt(hexa['E_sens1'], ' lx')}, sens 2 : {fmt(hexa['E_sens2'], ' lx')}) · "
+                       f"{int(hexa['n_passages'])} passage(s)")
         return sel
     tid, extra = None, None
     if isinstance(src, dict) and src.get("type") == "deficit":
