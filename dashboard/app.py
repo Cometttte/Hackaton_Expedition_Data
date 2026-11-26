@@ -45,20 +45,13 @@ LIEN_HACKATHON = "https://www.bouygues-es.fr"                                # H
 # Fonds de carte (tuiles raster, gratuites, sans clé). Satellite : mêmes tuiles que carte.html (getys_rapport.py)
 ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/{}/MapServer/tile/{{z}}/{{y}}/{{x}}"
 ATTR_ESRI = "© Esri, HERE, Garmin, © OpenStreetMap contributors"
-OSM = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-ATTR_OSM = "© contributeurs OpenStreetMap"
-ZOOM_BASCULE = 16.5      # au-delà, les fonds gris Esri n'ont plus de tuiles (zoom natif 16) : relais OSM en gris
-ZOOM_MAX = 19            # zoom natif max des tuiles OSM et de l'imagerie satellite : carte nette jusque-là
-# Chaque calque : (url, attribution, zoom natif max, zoom min, zoom max, classe CSS). Les tuiles raster CARTO
-# demandent désormais une clé ; Esri gris pour la vue d'ensemble, puis OpenStreetMap passé en gris par un
-# filtre CSS (assets/style.css) pour rester net à l'échelle de la rue.
+ZOOM_MAX = 21            # fonds vectoriels (OpenFreeMap) : nets à tous les zooms
+# Clair / Sombre : fond vectoriel OpenFreeMap dessiné par MapLibre dans Leaflet (assets/carte_leaflet.js,
+# getys.appliquerFond) : aucune tuile raster ici. Satellite : imagerie Esri, zoom natif 19.
+# Chaque calque raster : (url, attribution, zoom natif max, zoom min, zoom max, classe CSS).
 FONDS = {
-    "sombre": [(ESRI.format("Canvas/World_Dark_Gray_Base"), ATTR_ESRI, 16, 0, ZOOM_BASCULE, ""),
-               (ESRI.format("Canvas/World_Dark_Gray_Reference"), "", 16, 0, ZOOM_BASCULE, ""),
-               (OSM, ATTR_OSM, 19, ZOOM_BASCULE, ZOOM_MAX, "tuiles-osm-sombre")],
-    "clair": [(ESRI.format("Canvas/World_Light_Gray_Base"), ATTR_ESRI, 16, 0, ZOOM_BASCULE, ""),
-              (ESRI.format("Canvas/World_Light_Gray_Reference"), "", 16, 0, ZOOM_BASCULE, ""),
-              (OSM, ATTR_OSM, 19, ZOOM_BASCULE, ZOOM_MAX, "tuiles-osm-clair")],
+    "sombre": [],
+    "clair": [],
     "satellite": [(ESRI.format("World_Imagery"), "Imagerie © Esri, Maxar, Earthstar Geographics", 19, 0, ZOOM_MAX, ""),
                   (ESRI.format("Reference/World_Boundaries_and_Places"), "", 19, 0, ZOOM_MAX, "")],
 }
@@ -124,9 +117,11 @@ BARRE_COULEUR = dict(thickness=12, x=0.99, xanchor="right", len=0.55, bgcolor="r
                      tickfont=dict(color="#e6edf3"), title_font=dict(color="#e6edf3"))
 
 app = dash.Dash(__name__, title="Éclairage public", suppress_callback_exceptions=True,
+                external_scripts=[],          # MapLibre est chargé à la demande par assets/carte_leaflet.js
                 compress=True,                    # réponses des callbacks compressées (flask-compress)
                 external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP,
-                                      "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap"])
+                                      "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap",
+                                      "https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"])
 
 
 @app.server.route("/rapport/<path:chemin>")
@@ -664,6 +659,7 @@ champs_sdal = [
 app.layout = html.Div(className="page", children=[
     dcc.Store(id="selection"), html.Div(id="defilement", hidden=True),
     dcc.Store(id="urls-prechargement"), html.Div(id="prechargement", hidden=True),
+    html.Div(id="fond-vectoriel", hidden=True),
     # --- barre du haut
     html.Header(className="entete", children=dbc.Container(fluid=True, children=dbc.Row(
         align="center", className="g-2", children=[
@@ -1020,6 +1016,11 @@ def afficher_lampes(couches, dossier):
 def afficher_legende(mode, couleur, couches, dossier):
     return legende(mode, couleur if mode == "troncons" else "eclairement", couches,
                    charger(dossier) if dossier else None)
+
+
+app.clientside_callback(
+    ClientsideFunction(namespace="getys", function_name="appliquerFond"),
+    Output("fond-vectoriel", "children"), Input("fond", "value"))
 
 
 @app.callback(Output("fonds", "children"), Output("cadre-carte", "className"), Input("fond", "value"))

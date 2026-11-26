@@ -92,3 +92,62 @@ window.getys = Object.assign({}, window.getys, (function () {
         },
     };
 })());
+
+/* Fond de plan vectoriel (OpenFreeMap, sans clé) affiché DANS Leaflet par l'extension maplibre-gl-leaflet :
+   Leaflet reste le moteur de la carte (calques, clics, zoom) ; MapLibre ne dessine que le fond, net à tous
+   les zooms et en haute résolution. Satellite : tuiles raster Esri (zoom 19 max). */
+window.getys = Object.assign({}, window.getys, (function () {
+    const STYLES = {clair: 'https://tiles.openfreemap.org/styles/positron',
+                    sombre: 'https://tiles.openfreemap.org/styles/dark'};
+    const ATTRIBUTION = '<a href="https://openfreemap.org" target="_blank">OpenFreeMap</a> © ' +
+        '<a href="https://www.openmaptiles.org/" target="_blank">OpenMapTiles</a> © ' +
+        '<a href="https://www.openstreetmap.org/copyright" target="_blank">contributeurs OpenStreetMap</a>';
+    const LIBS = ['https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js',
+                  'https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js'];
+    let chargement = null, calque = null, styleActif = null;
+
+    function charger(url) {
+        return new Promise((ok, ko) => {
+            const s = document.createElement('script');
+            s.src = url; s.onload = ok; s.onerror = ko; document.head.appendChild(s);
+        });
+    }
+    // MapLibre puis l'extension, une seule fois, quand Leaflet (window.L) est prêt
+    function bibliotheques() {
+        if (!chargement) {
+            chargement = new Promise(ok => {
+                (function attendre() { (window.L && L.Map) ? ok() : setTimeout(attendre, 30); })();
+            }).then(() => charger(LIBS[0])).then(() => charger(LIBS[1]));
+        }
+        return chargement;
+    }
+    function carte() {
+        return new Promise(ok => { (function attendre() {
+            window.getysCarte ? ok(window.getysCarte) : setTimeout(attendre, 50); })(); });
+    }
+
+    return {
+        appliquerFond: async function (fond) {
+            const m = await carte();
+            const style = STYLES[fond] || null;
+            if (style === styleActif) return fond;
+            if (calque) { m.removeLayer(calque); calque = null; }
+            styleActif = style;
+            if (style) {
+                await bibliotheques();
+                if (styleActif !== style) return fond;            // changé entre-temps
+                calque = L.maplibreGL({style: style, attribution: ATTRIBUTION, interactive: false});
+                calque.addTo(m);
+                m.setMaxZoom(21);                                 // vectoriel : net jusqu'à la rue
+            } else {
+                m.setMaxZoom(19);                                 // satellite : zoom natif max des images
+                if (m.getZoom() > 19) m.setZoom(19);
+            }
+            return fond;
+        },
+    };
+})());
+// Dash cherche les fonctions client dans window.dash_clientside.<namespace>
+window.dash_clientside = Object.assign({}, window.dash_clientside, {
+    getys: {appliquerFond: (fond) => window.getys.appliquerFond(fond)},
+});
