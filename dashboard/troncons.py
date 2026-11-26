@@ -26,7 +26,9 @@ from pyproj import Transformer
 from scipy.spatial import cKDTree
 
 VOIRIE_DIR = Path(__file__).resolve().parent / "voirie"   # cache du filaire OSM
-OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"]
+OVERPASS = ["https://overpass-api.de/api/interpreter",                     # serveurs publics, essayés dans l'ordre
+            "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+            "https://overpass.kumi.systems/api/interpreter"]
 TYPES = ("motorway|trunk|primary|secondary|tertiary|unclassified|residential|living_street|service|road|"
          "motorway_link|trunk_link|primary_link|secondary_link|tertiary_link")
 
@@ -77,7 +79,7 @@ def charger_voirie(lat, lon) -> list[dict]:
     derniere = None
     for url in OVERPASS:
         try:
-            r = requests.post(url, data={"data": q}, timeout=150,
+            r = requests.post(url, data={"data": q}, timeout=90,
                               headers={"User-Agent": "getys-dashboard/1.0"})
             r.raise_for_status()
             d = r.json()
