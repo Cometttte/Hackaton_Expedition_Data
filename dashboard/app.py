@@ -37,7 +37,19 @@ ICI = Path(__file__).resolve().parent
 RACINE = ICI.parent                           # racine du dépôt (getys_rapport.py, rapports/)
 SERVER_URL = os.environ.get("SERVER_URL", "http://localhost:5001/upload")   # serveur d'analyse (serveur.py)
 RAPPORTS_DIR = Path(os.environ.get("RAPPORTS_DIR", RACINE / "rapports"))     # sorties de getys_rapport.py
-FONDS = {"sombre": "carto-darkmatter", "clair": "carto-positron"}           # fonds de carte gratuits, sans clé
+FONDS = {"sombre": "carto-darkmatter", "clair": "carto-positron", "satellite": "white-bg"}   # gratuits, sans clé
+# Satellite : mêmes tuiles que carte.html (getys_rapport.py) : imagerie Esri + noms de lieux par-dessus
+ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/{}/MapServer/tile/{{z}}/{{y}}/{{x}}"
+COUCHES_SATELLITE = [
+    {"below": "traces", "sourcetype": "raster", "source": [ESRI.format("World_Imagery")],
+     "sourceattribution": "Imagerie © Esri, Maxar, Earthstar Geographics"},
+    {"below": "traces", "sourcetype": "raster", "source": [ESRI.format("Reference/World_Boundaries_and_Places")]},
+]
+
+
+def fond_carte(fond):
+    """(style MapLibre, couches raster, légende claire ?) pour un fond de carte."""
+    return FONDS[fond], (COUCHES_SATELLITE if fond == "satellite" else []), fond == "clair"
 VERT, ROUGE, ORANGE, AMBRE, CYAN = "#2fbf71", "#e5484d", "#ff9f43", "#f5b301", "#38d9f5"
 CARTE_H = 640
 ZOOM0 = 13.6
@@ -419,9 +431,9 @@ def carte(data, mode, couleur, couches, sdal, selection, fond, vue, uirev):
                                 mode="markers", name="Point Street View", showlegend=False, hoverinfo="skip",
                                 marker=dict(size=18, color=CYAN, opacity=0.95)))
 
-    clair = fond == "clair"
+    style, couches_fond, clair = fond_carte(fond)
     centre = vue.get("center") or {"lat": m["lat"].mean(), "lon": m["lon"].mean()}
-    fig.update_layout(map=dict(style=FONDS[fond], center=centre, zoom=zoom),   # vue courante : pas de saut
+    fig.update_layout(map=dict(style=style, layers=couches_fond, center=centre, zoom=zoom),   # vue courante
                       margin=dict(l=0, r=0, t=0, b=0), height=CARTE_H, uirevision=uirev or "carte",
                       showlegend=True,
                       legend=dict(x=0.01, y=0.99, bgcolor="rgba(255,255,255,0.88)" if clair else "rgba(13,17,23,0.8)",
@@ -706,7 +718,9 @@ app.layout = html.Div(className="page", children=[
                         "Bruit"),
                     segmente("fond", "sombre", [
                         {"label": [html.I(className="bi bi-moon-stars me-1"), "Sombre"], "value": "sombre"},
-                        {"label": [html.I(className="bi bi-sun me-1"), "Clair"], "value": "clair"}], "Fond"),
+                        {"label": [html.I(className="bi bi-sun me-1"), "Clair"], "value": "clair"},
+                        {"label": [html.I(className="bi bi-globe-europe-africa me-1"), "Satellite"],
+                         "value": "satellite"}], "Fond"),
                     dbc.Checklist(id="couches", value=[], switch=True, className="small outil-couches",
                                   options=[{"label": "Lampadaires estimés", "value": "lum"},
                                            {"label": "Supports suspects", "value": "sus"}]),
@@ -986,9 +1000,10 @@ def options_couleur(mode, valeur):
 
 @app.callback(Output("carte", "figure", allow_duplicate=True), Input("fond", "value"), prevent_initial_call=True)
 def changer_fond(fond):
-    clair = fond == "clair"
+    style, couches_fond, clair = fond_carte(fond)
     p = Patch()
-    p["layout"]["map"]["style"] = FONDS[fond]
+    p["layout"]["map"]["style"] = style
+    p["layout"]["map"]["layers"] = couches_fond
     p["layout"]["legend"]["bgcolor"] = "rgba(255,255,255,0.88)" if clair else "rgba(13,17,23,0.8)"
     p["layout"]["legend"]["bordercolor"] = "#c9ced6" if clair else "#30363d"
     p["layout"]["legend"]["font"]["color"] = "#1f2328" if clair else "#e6edf3"
