@@ -23,6 +23,9 @@ PC, IMU port C 5 Hz avec cap $PRDID, Calorimetre ~1 Hz) : getys_rapport.py le tr
            (12 m/s, x0,8), soit x1,0 par passage (x1,1 par échantillon brut à 50 Hz, neutralisé par le pas
            de 2 m) ; sens 2 = x0,5. Attendu par tronçon :
            E_sens2 / E_sens1 = 0,50 et E_moy / E_sens1 = 0,75 (moyenne des deux sens). Vérité dans verite.json
+    ... --commune chasseneuil-long --passages 6 --bruite
+        -> long parcours avec beaucoup de bruit et de fausses données (capteur bloqué, coupé ou décalibré,
+           valeurs absurdes, éblouissements, sauts et pertes GNSS, trames sans fix, arrêts avec scintillement)
 """
 from __future__ import annotations
 
@@ -49,6 +52,7 @@ TO84 = Transformer.from_crs(2154, 4326, always_xy=True)
 COMMUNES = {
     "ormesson": dict(nom="Ormesson-sur-Marne", A=(48.7845, 2.5345), B=(48.7893, 2.5468)),
     "chasseneuil": dict(nom="Chasseneuil-du-Poitou", A=(46.6478, 0.3655), B=(46.6552, 0.3790)),
+    "chasseneuil-long": dict(nom="Chasseneuil-du-Poitou", A=(46.6395, 0.3560), B=(46.6650, 0.3905)),
 }
 FS = 50.0                        # luxmètres : 50 Hz
 LATERAL_CAPTEURS = {"Lux1": -0.49, "Lux2": 0.0, "Lux3": 0.49}    # lux_position du vrai TDMS (y > 0 = gauche)
@@ -61,9 +65,9 @@ DECALAGE_HORLOGE = 3.4           # horloge PC en avance sur le GPS (s), corrigé
 # ------------------------------------------------------------------ filaire et itinéraire
 def graphe(A, B):
     """Graphe des voies OSM autour de l'itinéraire : nœuds = coordonnées partagées, arêtes = longueur (L93).
-    Emprise large (~1,5 km autour de A et B) : elle couvre ensuite toute la tournée dans le dashboard."""
-    lat = np.array([min(A[0], B[0]) - 0.012, max(A[0], B[0]) + 0.012])
-    lon = np.array([min(A[1], B[1]) - 0.017, max(A[1], B[1]) + 0.017])
+    L'emprise couvre ensuite toute la tournée dans le dashboard (même cache dashboard/voirie/)."""
+    lat = np.array([min(A[0], B[0]) - 0.004, max(A[0], B[0]) + 0.004])      # ~450 m de marge : assez pour
+    lon = np.array([min(A[1], B[1]) - 0.006, max(A[1], B[1]) + 0.006])      # l'itinéraire, léger pour Overpass
     ways = T.charger_voirie(lat, lon)
     voisins, coords = {}, {}
     for w in ways:
@@ -192,11 +196,14 @@ def ddmm(v, lat):
     return (f"{d:02d}{m:010.7f}" if lat else f"{d:03d}{m:010.7f}"), ("N" if v >= 0 else "S") if lat else ("E" if v >= 0 else "W")
 
 
-def gga(t, lat, lon):
+def gga(t, lat, lon, q=2, nsat=14, hdop=0.8):
     h = datetime.fromtimestamp(t, timezone.utc)
     la, ns = ddmm(lat, True)
     lo, ew = ddmm(lon, False)
-    p = f"GPGGA,{h:%H%M%S}.{int(h.microsecond / 1e4):02d},{la},{ns},{lo},{ew},2,14,0.8,98.000,M,46.785,M,2.0,0136"
+    if q == 0:                                            # pas de fix : champs de position vides
+        la = ns = lo = ew = ""
+    p = (f"GPGGA,{h:%H%M%S}.{int(h.microsecond / 1e4):02d},{la},{ns},{lo},{ew},{q},{nsat},{hdop:.1f},"
+         f"98.000,M,46.785,M,2.0,0136")
     return f"${p}{cs(p)}"
 
 
@@ -213,7 +220,7 @@ def prdid(cap):
 
 # ------------------------------------------------------------------ génération
 def generer(sortie: Path, n_passages: int, graine: int, A, B, sens1=None, sens2=None, jour="2026-11-20",
-            ponderations=False):
+            ponderations=False, bruite=False):
     rng = np.random.default_rng(graine)
     voisins, coords = graphe(A, B)
     na, nb = plus_proche(coords, *A), plus_proche(coords, *B)
@@ -224,9 +231,7 @@ def generer(sortie: Path, n_passages: int, graine: int, A, B, sens1=None, sens2=
     dans = set(principal)
     carrefours = [i for i in range(len(principal) // 5, 3 * len(principal) // 5)
                   if any(v not in dans for v, _ in voisins[principal[i]])]       # nœuds avec une rue latérale
-    if not carrefours:
-        raise RuntimeError("pas de carrefour pour le détour")
-    i_det = min(carrefours, key=lambda i: abs(i - len(principal) * 2 // 5))
+    i_det = min(carrefours, key=lambda i: abs(i - len(principal) * 2 // 5)) if carrefours else len(principal) // 2
     n_det = principal[i_det]
     interdits = frozenset(zip(principal[:-1], principal[1:]))
     # détour : aller vers un nœud à ~160 m par une rue latérale, puis retour sur l'itinéraire principal plus loin
@@ -244,10 +249,12 @@ def generer(sortie: Path, n_passages: int, graine: int, A, B, sens1=None, sens2=
         if not set(aller[1:-1]) & set(retour[1:-1]) and not set(aller[1:]) & dans:
             boucle = aller + retour[1:]
             break
-    if boucle is None:
-        raise RuntimeError("pas de détour trouvé")
-    j_ret = principal.index(boucle[-1])                           # où le détour rejoint l'itinéraire
-    xy_b = polyligne(coords, boucle)
+    xy_b, j_ret = None, None
+    if boucle is not None:
+        j_ret = principal.index(boucle[-1])                       # où le détour rejoint l'itinéraire
+        xy_b = polyligne(coords, boucle)
+    else:
+        print("  (pas de détour possible sur cet itinéraire : tournée sans détour)")
 
     # --- programme des trajets
     par_sens = sens1 is not None and sens2 is not None
@@ -264,8 +271,11 @@ def generer(sortie: Path, n_passages: int, graine: int, A, B, sens1=None, sens2=
         lamps = lampadaires(xy_p, rng, eteints=(0.62 * L, 0.62 * L + 150))
     else:
         # A -> B, B -> A, ... ; détour (même sens) pendant les 2 premiers allers
-        plan = [("detour", None) if (k % 2 == 0 and k < 4) else ("principal", k % 2 == 0) for k in range(n_passages)]
-        lamps = lampadaires(xy_p, rng, eteints=(0.62 * L, 0.62 * L + 150)) + lampadaires(xy_b, rng, debut_type=1)
+        plan = [("detour", None) if (k % 2 == 0 and k < 4 and xy_b is not None) else ("principal", k % 2 == 0)
+                for k in range(n_passages)]
+        lamps = lampadaires(xy_p, rng, eteints=(0.62 * L, 0.62 * L + 150))
+        if xy_b is not None:
+            lamps += lampadaires(xy_b, rng, debut_type=1)
 
     a, m_, j = (int(x) for x in jour.split("-"))
     t_gps0 = datetime(a, m_, j, 19, 0, 0, tzinfo=timezone.utc).timestamp()   # 20h00 heure locale
@@ -292,6 +302,14 @@ def generer(sortie: Path, n_passages: int, graine: int, A, B, sens1=None, sens2=
             n_aller += int(bool(aller))
             (vitesse, facteur), variation = PONDS[cle], False
             programme.append(dict(sens=1 if aller else 2, type=cle, vitesse_ms=vitesse, facteur=facteur))
+        if bruite and quoi == "principal":                   # arrêt de 20 à 40 s au milieu (feu, livraison...)
+            k = len(trajet) // 2
+            for moitie, arret in ((trajet[: k + 1], rng.uniform(20, 40)), (trajet[k:], 6.0)):
+                r = rouler(moitie, t, vitesse, rng, arret_fin=arret, variation=variation)
+                morceaux.append(r)
+                facteurs.append(np.full(r[0].size, facteur))
+                t = r[0][-1] + 1 / FS
+            continue
         r = rouler(trajet, t, vitesse, rng, variation=variation)
         morceaux.append(r)
         facteurs.append(np.full(r[0].size, facteur))
@@ -314,13 +332,36 @@ def generer(sortie: Path, n_passages: int, graine: int, A, B, sens1=None, sens2=
         E = np.full(xv.shape, 0.6)
         E[sur] = eclairement((xv + dl * gx)[sur], (yv + dl * gy)[sur], lamps)
         E = E * facteur                                   # pondération du passage (1 hors scénario de test)
-        E = E * rng.normal(1.0, 0.025, E.size) + rng.normal(0, 0.15, E.size) - 0.25   # gain, bruit, offset
+        if bruite:                                        # bruit fort + dérive de l'offset au fil du relevé
+            derive = np.linspace(0, -1.5 if nom == "Lux3" else -0.4, E.size)
+            E = E * rng.normal(1.0, 0.09, E.size) + rng.normal(0, 0.6, E.size) - 0.25 + derive
+        else:
+            E = E * rng.normal(1.0, 0.025, E.size) + rng.normal(0, 0.15, E.size) - 0.25   # gain, bruit, offset
         L3[nom] = E
     n = t_all.size
-    for _ in range(int(n / FS / 25)):                     # parasites sur un seul capteur (filtre de Hampel)
+    fausses = {}
+    if bruite:
+        arret = np.r_[np.abs(v) < 0.3]
+        for nom in L3:                                    # scintillement à l'arrêt (lampe qui clignote)
+            L3[nom][arret] *= 1 + 0.35 * np.sin(np.arange(arret.sum()) / FS * 2 * np.pi * 1.7)
+        def fenetre(duree_s):
+            d = int(duree_s * FS)
+            i = int(rng.integers(int(0.1 * n), int(0.9 * n) - d))
+            return slice(i, i + d)
+        f = fenetre(60); L3["Lux1"][f] = float(np.median(L3["Lux1"][f]))        # capteur bloqué
+        fausses["Lux1 bloqué 60 s"] = f.start / FS
+        f = fenetre(30); L3["Lux3"][f] = 0.0                                     # capteur coupé
+        fausses["Lux3 coupé 30 s"] = f.start / FS
+        f = fenetre(90); L3["Lux2"][f] *= 1.6                                    # capteur décalibré
+        fausses["Lux2 x1,6 sur 90 s"] = f.start / FS
+        for _ in range(int(n / FS / 60)):                                         # valeurs absurdes (« trop haut »)
+            i = int(rng.integers(0, n - 5))
+            for nom in L3:
+                L3[nom][i:i + 5] = rng.uniform(400, 2000)
+    for _ in range(int(n / FS / (3 if bruite else 25))):   # parasites sur un seul capteur (filtre de Hampel)
         i = rng.integers(0, n - 5)
         L3[rng.choice(list(LATERAL_CAPTEURS))][i:i + 3] += rng.uniform(60, 220)
-    for _ in range(int(n / FS / 70)):                     # éblouissements brefs sur les 3 capteurs (« trop bref »)
+    for _ in range(int(n / FS / (12 if bruite else 70))):  # éblouissements brefs sur les 3 capteurs (« trop bref »)
         i = rng.integers(0, n - 10)
         for nom in L3:
             L3[nom][i:i + 6] += rng.uniform(90, 160)
@@ -328,17 +369,32 @@ def generer(sortie: Path, n_passages: int, graine: int, A, B, sens1=None, sens2=
     # --- GNSS : positions de l'antenne (axe du véhicule) + bruit, port C 5 Hz et port A 1 Hz
     lon, lat = TO84.transform(xv + rng.normal(0, 0.25, n), yv + rng.normal(0, 0.25, n))
     gnss_ok = np.isfinite(xv)
+    qualite = np.full(n, 2); hdop = np.full(n, 0.8)
+    if bruite:
+        for _ in range(8):                                # pertes du signal GNSS de 5 à 20 s
+            d = int(rng.uniform(5, 20) * FS); i = int(rng.integers(0, n - d)); gnss_ok[i:i + d] = False
+        sauts = rng.random(n) < 0.004                     # positions aberrantes à 30-80 m
+        ang = rng.uniform(0, 2 * np.pi, n); dist = rng.uniform(30, 80, n)
+        lon_s, lat_s = TO84.transform(xv + np.where(sauts, dist * np.cos(ang), 0),
+                                      yv + np.where(sauts, dist * np.sin(ang), 0))
+        lon = np.where(sauts, lon_s, lon); lat = np.where(sauts, lat_s, lat)
+        qualite[rng.random(n) < 0.004] = 0                # trames sans fix
+        for _ in range(6):                                # HDOP dégradé (passage sous les arbres, immeubles)
+            d = int(rng.uniform(20, 60) * FS); i = int(rng.integers(0, n - d))
+            hdop[i:i + d] = rng.uniform(2.5, 6.0); qualite[i:i + d] = np.where(qualite[i:i + d] == 0, 0, 1)
+        fausses["GNSS"] = dict(pertes=8, sauts=int(sauts.sum()), sans_fix=int((qualite == 0).sum()))
     idx_c = np.arange(0, n, int(FS / 5)); idx_c = idx_c[gnss_ok[idx_c]]
     idx_a = np.arange(0, n, int(FS)); idx_a = idx_a[gnss_ok[idx_a]]
     pc = lambda tt: tt + DECALAGE_HORLOGE + rng.uniform(0.02, 0.08)   # noqa: E731  (réception PC)
     octets, dates_c = [], []
     for i in idx_c:
-        bloc = "\r\n".join([prdid(cap[i]), gga(t_all[i], lat[i], lon[i]), zda(t_all[i])]) + "\r\n"
+        bloc = "\r\n".join([prdid(cap[i]), gga(t_all[i], lat[i], lon[i], qualite[i], 14, hdop[i]),
+                            zda(t_all[i])]) + "\r\n"
         octets.append(np.frombuffer(bloc.encode("ascii"), np.uint8))
         dates_c.append(pc(t_all[i]))
     msgs_a, dates_a = [], []
     for i in idx_a:
-        for m in (gga(t_all[i], lat[i], lon[i]), zda(t_all[i])):
+        for m in (gga(t_all[i], lat[i], lon[i], qualite[i], 14, hdop[i]), zda(t_all[i])):
             msgs_a.append(m + "\r\n")
             dates_a.append(pc(t_all[i]))
 
@@ -353,7 +409,10 @@ def generer(sortie: Path, n_passages: int, graine: int, A, B, sens1=None, sens2=
             continue
         d = np.hypot(lxs - xv[i], lys - yv[i]) + np.where(actif, 0, 1e9)
         j = int(np.argmin(d))
-        tcp.append(0.0 if (d[j] > 25 or typ[j] == "sodium") else float(rng.normal(2990, 40)))
+        val = 0.0 if (d[j] > 25 or typ[j] == "sodium") else float(rng.normal(2990, 300 if bruite else 40))
+        if bruite and rng.random() < 0.03:                # lectures aberrantes du chromamètre
+            val = float(rng.uniform(1500, 9000))
+        tcp.append(val)
 
     # --- écriture : horodatages PC (UTC naïf), comme les vrais relevés
     def dt64(ts):
@@ -398,14 +457,20 @@ def generer(sortie: Path, n_passages: int, graine: int, A, B, sens1=None, sens2=
                   "Les passages lents produisent 3x plus d'échantillons à 50 Hz, mais le ré-échantillonnage tous "
                   "les 2 m de getys_analyse.py donne autant de points par mètre à chaque passage : attendu x1,0."))
         (sortie.parent / "verite.json").write_text(json.dumps(verite, ensure_ascii=False, indent=2), encoding="utf-8")
+    if bruite:
+        (sortie.parent / "fausses_donnees.json").write_text(json.dumps(
+            {k: (round(v_, 1) if isinstance(v_, float) else v_) for k, v_ in fausses.items()},
+            ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"  fausses données : {fausses}")
     duree = (t_all[-1] - t_all[0]) / 60
     print(f"✓ {sortie}  ({sortie.stat().st_size / 1e6:.1f} Mo)")
     if par_sens:
         print(f"  itinéraire principal {L:.0f} m : {sens1} passages A -> B, {sens2} passages B -> A"
               + (f" ; {abs(sens1 - sens2)} repositionnements sans GNSS" if sens1 != sens2 else ""))
     else:
-        print(f"  itinéraire principal {L:.0f} m, {n_passages} passages alternés ; détour "
-          f"{float(np.hypot(*np.diff(xy_b, axis=0).T).sum()):.0f} m, 2 passages dans un seul sens")
+        print(f"  itinéraire principal {L:.0f} m, {n_passages} passages alternés"
+              + (f" ; détour {float(np.hypot(*np.diff(xy_b, axis=0).T).sum()):.0f} m, 2 passages dans un seul sens"
+                 if xy_b is not None else ""))
     print(f"  {len(lamps)} lampadaires (dont {int((~actif).sum())} éteints sur ~150 m), "
           f"{duree:.0f} min de relevé, {n} échantillons par capteur")
 
@@ -419,12 +484,14 @@ def main():
     ap.add_argument("--sens1", type=int, default=None, help="passages A -> B (avec --sens2 : remplace --passages)")
     ap.add_argument("--sens2", type=int, default=None, help="passages B -> A")
     ap.add_argument("--date", default="2026-11-20", help="date de la tournée (AAAA-MM-JJ), 20h00 heure locale")
+    ap.add_argument("--bruite", action="store_true",
+                    help="beaucoup de bruit et de fausses données (capteurs, GNSS, chromamètre, arrêts)")
     ap.add_argument("--ponderations", action="store_true",
                     help="avec --sens1/--sens2 : pondérations connues pour vérifier l'algorithme des tronçons")
     a = ap.parse_args()
     c = COMMUNES[a.commune]
     sortie = Path(a.sortie) if a.sortie else RACINE / "donnees_test" / f"{c['nom']}.tdms"
-    generer(sortie, a.passages, a.graine, c["A"], c["B"], a.sens1, a.sens2, a.date, a.ponderations)
+    generer(sortie, a.passages, a.graine, c["A"], c["B"], a.sens1, a.sens2, a.date, a.ponderations, a.bruite)
 
 
 if __name__ == "__main__":
