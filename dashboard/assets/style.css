@@ -233,3 +233,14 @@ a { color: var(--bes-bleu); }
 .voile-titre { font-weight: 700; color: var(--bes-marine); font-size: 1rem; }
 .voile-detail { font-size: 0.8rem; color: var(--texte-2); }
 @keyframes tourne { to { transform: rotate(360deg); } }
+
+/* --- vue « Par type de voie » */
+.carte-type { height: 100%; border: 1px solid var(--bord); border-left: 4px solid var(--bes-marine); border-radius: 6px;
+  padding: 10px 12px; background: var(--surface); display: flex; flex-direction: column; gap: 4px; }
+.carte-type-nom { font-weight: 700; color: var(--bes-marine); font-size: 0.92rem; }
+.carte-type-part { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.carte-type-legende { font-size: 0.75rem; color: var(--texte-2); }
+.carte-type-chiffres { display: flex; gap: 14px; margin-top: 4px; }
+.carte-type-chiffres > div { display: flex; flex-direction: column; font-size: 0.72rem; color: var(--texte-2); }
+.carte-type-chiffres b { font-size: 0.95rem; color: var(--texte); font-variant-numeric: tabular-nums; }
+.carte-type-chiffres .text-danger b { color: var(--bes-orange); }

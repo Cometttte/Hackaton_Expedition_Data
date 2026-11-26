@@ -418,24 +418,51 @@ VIDE = {"type": "FeatureCollection", "features": []}
 
 
 # ------------------------------------------------------------------ PANNEAUX
-def distribution(tr):
-    """E moyen des tronçons par type de voie, avec le seuil SDAL de chaque type."""
+def vue_types(tr):
+    """Par type de voie : une carte par type (seuil, linéaire, part conforme, éclairement moyen) et le linéaire
+    conforme / non conforme / mesuré dans un seul sens, en km."""
     if tr is None or tr.empty:
-        return carte_vide("Pas de tronçons", 360)
-    fig = go.Figure()
+        return html.P("Pas de tronçons dans ce rapport.", className="text-muted")
+    lignes, cartes = [], []
     for c in [c for c in T.CLASSES if c in set(tr["classe"])]:
-        sous = tr[tr["classe"] == c]
-        lib = f"{T.CLASSES[c][0]} ({len(sous)})"
-        fig.add_trace(go.Box(x=sous["E_moy"], name=lib, boxpoints="all", jitter=0.4, pointpos=0,
-                             marker=dict(size=4, color=AMBRE, opacity=0.6),
-                             line_color=MARINE, fillcolor="rgba(28,41,89,0.06)", customdata=sous["nom"],
-                             hovertemplate="%{customdata}<br>%{x:.1f} lx<extra></extra>", orientation="h"))
-        fig.add_trace(go.Scatter(x=[sous["seuil"].iat[0]] * 2, y=[lib, lib], mode="markers", showlegend=False,
-                                 marker=dict(symbol="line-ns", size=30, line=dict(width=3, color=ROUGE)),
-                                 hovertemplate=f"seuil SDAL : {sous['seuil'].iat[0]} lx<extra></extra>"))
-    fig.update_layout(height=360, margin=dict(l=10, r=10, t=10, b=30), showlegend=False,
-                      xaxis_title="Éclairement moyen du tronçon (lx) — trait ambre : seuil SDAL")
-    return fig
+        t = tr[tr["classe"] == c]
+        lg = t["longueur_m"]
+        km = lg.sum() / 1000
+        conf = lg[t["conforme"]].sum() / 1000
+        nc_1s = lg[~t["conforme"] & t["a_completer"]].sum() / 1000
+        nc = km - conf - nc_1s
+        e = float((t["E_moy"] * lg).sum() / lg.sum())
+        seuil = float(t["seuil"].iat[0])
+        part = 100 * conf / km if km else 0
+        coul = "success" if part >= 80 else "warning" if part >= 50 else "danger"
+        lignes.append(dict(type=T.CLASSES[c][0], conf=conf, nc=nc, nc_1s=nc_1s))
+        cartes.append(dbc.Col(xs=12, md=6, children=html.Div(className="carte-type", children=[
+            html.Div([html.Span(T.CLASSES[c][0], className="carte-type-nom"),
+                      html.Span(f"seuil {fmt(seuil, ' lx')}", className="badge-type")],
+                     className="d-flex justify-content-between align-items-center"),
+            html.Div([html.Span(fmt(part, " %", 0), className=f"carte-type-part text-{coul}"),
+                      html.Span(" du linéaire conforme", className="carte-type-legende")]),
+            dbc.Progress(value=part, color=coul, className="kpi-barre"),
+            html.Div(className="carte-type-chiffres", children=[
+                html.Div([html.B(fmt(e, " lx")), html.Span("éclairement moyen")],
+                         className="text-danger" if e < seuil else ""),
+                html.Div([html.B(fmt(km, " km", 2)), html.Span(f"{len(t)} tronçon(s)")]),
+                html.Div([html.B(f"{int((~t['conforme']).sum())}"), html.Span("sous le seuil")]),
+            ]),
+        ])))
+    d = pd.DataFrame(lignes).iloc[::-1]
+    fig = go.Figure()
+    for col, nom, coul in (("conf", "Conforme", VERT), ("nc", "Non conforme", ROUGE),
+                           ("nc_1s", "Non conforme · 1 seul sens", ORANGE)):
+        fig.add_trace(go.Bar(y=d["type"], x=d[col], name=nom, orientation="h", marker_color=coul,
+                             marker_line_width=0, hovertemplate="%{y}<br>" + nom + " : %{x:.2f} km<extra></extra>"))
+    fig.update_layout(barmode="stack", height=60 + 52 * len(d), margin=dict(l=10, r=10, t=30, b=30),
+                      xaxis_title="Linéaire mesuré (km)", bargap=0.35,
+                      legend=dict(orientation="h", y=1.15, x=0, font_size=11, traceorder="normal"))
+    return dbc.Row(className="g-3", children=[
+        dbc.Col(xl=6, children=dbc.Row(cartes, className="g-2")),
+        dbc.Col(xl=6, children=dcc.Graph(figure=fig, config={"displayModeBar": False})),
+    ])
 
 
 def types_lampes(data):
@@ -557,8 +584,6 @@ def qualite(data, tr):
                   size="sm", className="mb-3 tableau-qualite"),
         html.H6([html.I(className="bi bi-exclamation-diamond me-2 text-warning"),
                  f"Tronçons à fiabiliser ({len(fiab)})"], className="fw-semibold"),
-        html.P("Moyennes fragiles : à repasser ou à vérifier. Cliquez une ligne : la carte va sur le tronçon.",
-               className="small text-muted"),
         dash_table.DataTable(
             id="table-qualite", data=fiab, page_size=8, sort_action="native", filter_action="native",
             columns=[{"name": "Voie", "id": "nom"}, {"name": "Problème", "id": "probleme"},
@@ -684,10 +709,6 @@ app.layout = html.Div(className="page", children=[
                            ]),
                     html.Div(id="legende", className="legende-carte"),
                 ]), className="p-0"),
-                dbc.CardFooter([html.I(className="bi bi-cursor me-2"),
-                                "Cliquez sur la carte ou sur une ligne d'un tableau : "
-                                "la carte va sur le tronçon et Street View s'affiche à droite."],
-                               className="small text-muted"),
             ])),
             # --- Street View + SDAL
             dbc.Col(xl=4, className="d-flex flex-column gap-3", children=[
@@ -702,8 +723,6 @@ app.layout = html.Div(className="page", children=[
                                                             "Google Maps"])),
                 carte_bloc("SDAL — seuils par type de voie", "sliders", [
                     *champs_sdal,
-                    html.Div("Éclairement moyen minimal exigé (hypothèses en attendant le SDAL de la commune). "
-                             "Tout le dashboard se met à jour.", className="small text-muted mt-2"),
                 ]),
             ]),
         ]),
@@ -719,7 +738,7 @@ app.layout = html.Div(className="page", children=[
                 ])),
                 dbc.CardBody([
                     html.Div(id="tableau"),
-                    html.Div(dcc.Graph(id="distrib", config={"displayModeBar": False}), id="p-distrib"),
+                    html.Div(id="p-distrib"),
                     html.Div(dcc.Graph(id="lampes", config={"displayModeBar": False}), id="p-lampes"),
                     html.Div(dcc.Graph(id="chrono", config={"displayModeBar": False}), id="p-chrono"),
                     html.Div(id="qualite"),
@@ -892,13 +911,13 @@ def changer_onglet(onglet):
 
 # ------------------------------------------------------------------ CALLBACKS : AFFICHAGE
 @app.callback(Output("contexte", "children"), Output("kpis", "children"),
-              Output("distrib", "figure"), Output("lampes", "figure"), Output("chrono", "figure"),
+              Output("p-distrib", "children"), Output("lampes", "figure"), Output("chrono", "figure"),
               Output("tableau", "children"), Output("qualite", "children"),
               Input("choix-rapport", "value"), *SDAL_INPUTS)
 def afficher(dossier, *valeurs):
     if not dossier:
         vide = carte_vide("Aucune tournée analysée — cliquez sur « Nouvelle tournée »", 360)
-        return None, [], None, vide, vide, vide, None, None
+        return None, [], None, vide, vide, None, None
     sdal = sdal_de(valeurs)
     data = charger(dossier)
     meta = data["resume"].get("meta", {})
@@ -940,7 +959,7 @@ def afficher(dossier, *valeurs):
         kpis.append(kpi("lightbulb", "Lampadaires estimés", fmt(k["n_lampadaires"], dec=0),
                         f"{fmt(k.get('puissance_tot_kw'), ' kW')} installés", "info"))
 
-    return ([contexte, alerte], kpis, distribution(tr), types_lampes(data),
+    return ([contexte, alerte], kpis, vue_types(tr), types_lampes(data),
             chronologie(data), tableau_troncons(tr), qualite(data, tr))
 
 
@@ -1100,8 +1119,7 @@ def afficher_streetview(sel):
                         allow="fullscreen")
     legende = [html.Div(sel.get("titre"), className="fw-semibold"),
                html.Div(sel.get("detail") or "", className="small text-muted"),
-               html.Div(f"{sel['lat']:.5f}, {sel['lon']:.5f} · Street View montre la rue de jour : utile pour "
-                        "vérifier la présence de lampadaires, pas s'ils sont allumés.", className="small text-muted")]
+               html.Div(f"{sel['lat']:.5f}, {sel['lon']:.5f}", className="small text-muted")]
     return cadre, legende, lien_streetview(sel["lat"], sel["lon"], sel.get("cap", 0)), "small text-info"
 
 
