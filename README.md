@@ -49,9 +49,9 @@ Sans Docker :
 
 Le dashboard lit `rapports/` et calcule à partir de `mesures_pas2m.csv` :
 - **Moyenne au tronçon** (`dashboard/troncons.py`) : filaire de voirie OpenStreetMap (cache dans `dashboard/voirie/`), coupé à chaque carrefour (parts de ~150 m au-delà de 250 m). Chaque mesure est rattachée au tronçon le plus proche (< 15 m) d'orientation compatible avec le cap. Moyenne **par sens de passage** (chaque passage pèse autant), puis **moyenne des deux sens**. Un tronçon à double sens mesuré dans un seul sens est signalé « à repasser ».
-- **Hexagones de 10 m** (`dashboard/hexagones.py`) : même règle, une moyenne par sens puis moyenne des deux sens.
-- **Conformité SDAL** : un seuil d'éclairement moyen par type de voie (principale, distribution, résidentielle, desserte), modifiable dans l'interface. Valeurs par défaut = hypothèses en attendant le SDAL de la commune.
-- **Points chauds / froids** : même méthode et même palette (0 à 50 lx) que `carte.html` : valeur moyenne, rayon de 9 m quel que soit le zoom, filtre sens 1 / sens 2.
+- **Hexagones de 1 m** (`dashboard/hexagones.py`) : même règle, une moyenne par sens puis moyenne des deux sens (visibles en zoomant sur une rue).
+- **Conformité SDAL** (tronçons uniquement) : un seuil d'éclairement moyen par type de voie (principale, distribution, résidentielle, desserte), modifiable dans l'interface. Valeurs par défaut = hypothèses en attendant le SDAL de la commune.
+- **Points chauds / froids** : même méthode et même palette (0 à 50 lx) que `carte.html` : valeur moyenne, rayon de 9 m quel que soit le zoom.
 - **Avant / après lissage du bruit** : toutes les vues peuvent être recalculées sur le signal brut (colonne `E_brut` de `mesures_pas2m.csv` : médiane des 3 capteurs, sans filtre de Hampel ni suppression des pics aberrants).
 - **Fond clair / sombre**, couches (lampadaires estimés) et sélection mis à jour sans recharger la carte : le zoom est conservé.
 - **Rues les plus en déficit** : classement par déficit cumulé (longueur × écart au seuil SDAL) ; un clic centre la carte sur le tronçon le plus sombre.

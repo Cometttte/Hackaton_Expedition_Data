@@ -2,10 +2,10 @@
 
 Trois lectures des mesures (cf. cahier des charges GETYS) :
   * Moyenne au tronçon : filaire OSM, une moyenne par sens de circulation puis moyenne des deux sens
-  * Hexagones de 10 m  : statistiques par cellule, multi-passages, même règle par sens
+  * Hexagones de 1 m   : statistiques par cellule, multi-passages, même règle par sens
   * Points chauds / froids : valeur moyenne autour de chaque point (méthode de carte.html, getys_rapport.py),
     rayon fixe en mètres quel que soit le zoom
-La conformité suit un SDAL : un seuil d'éclairement moyen par type de voie.
+La conformité (SDAL : un seuil d'éclairement moyen par type de voie) ne s'applique qu'aux tronçons.
 Chaque vue peut être affichée avant ou après le lissage du bruit (colonne E_brut de mesures_pas2m.csv).
 """
 import base64
@@ -153,11 +153,9 @@ def _charger(dossier, _mtime):
         except Exception as e:                           # pas de réseau / Overpass indisponible
             sortie["erreur_troncons"] = str(e)
 
-    # --- hexagones de 10 m : une moyenne par sens de passage, puis moyenne des deux sens
+    # --- hexagones de 1 m : une moyenne par sens de passage, puis moyenne des deux sens
     if sortie["mesures"] is not None:
-        gj, props = H.calculer(sortie["mesures"])
-        props["classe"] = classe_des_points(sortie, props["_lon"], props["_lat"])
-        sortie["hex"] = (gj, props)
+        sortie["hex"] = H.calculer(sortie["mesures"])
     if (d / "supports.csv").exists():
         s = lire_csv(d / "supports.csv")
         if "suspect" in s:
@@ -186,32 +184,8 @@ def _charger_brut(dossier, mtime):
         cl = base["troncons"].set_index("id")["classe"]
         sortie["troncons"], sortie["geoms"] = tr, geoms
         sortie["troncons"]["classe"] = tr["id"].map(cl).fillna(tr["classe"])
-    gj, props = H.calculer(m)
-    props["classe"] = classe_des_points(base, props["_lon"], props["_lat"])
-    sortie["hex"] = (gj, props)
+    sortie["hex"] = H.calculer(m)
     return sortie
-
-
-def _densifier_tr(data, pas=8.0):
-    """Points tous les `pas` m le long de chaque tronçon : (x, y, indice du tronçon)."""
-    xs, ys, ks = [], [], []
-    for k, tid in enumerate(data["troncons"]["id"]):
-        x, y = TO93.transform(*data["geoms"][tid])
-        x, y = np.asarray(x), np.asarray(y)
-        dd = np.r_[0, np.cumsum(np.hypot(np.diff(x), np.diff(y)))]
-        s = np.arange(0, dd[-1] + 1e-9, pas)
-        xs.append(np.interp(s, dd, x)); ys.append(np.interp(s, dd, y)); ks.append(np.full(len(s), k))
-    return np.concatenate(xs), np.concatenate(ys), np.concatenate(ks)
-
-
-def classe_des_points(data, lon, lat):
-    """Classe SDAL de la voie la plus proche (hexagones) ; résidentielle par défaut."""
-    if data["troncons"] is None or data["troncons"].empty:
-        return pd.Series("residentielle", index=lon.index)
-    x, y, k = _densifier_tr(data)
-    dist, i = cKDTree(np.c_[x, y]).query(np.c_[TO93.transform(lon.to_numpy(), lat.to_numpy())], k=1)
-    cl = data["troncons"]["classe"].to_numpy()[k[i]]
-    return pd.Series(np.where(dist < 30, cl, "residentielle"), index=lon.index)
 
 
 def lien_streetview(lat, lon, cap=0):
@@ -348,10 +322,8 @@ def _traces_troncons(data, tr, couleur):
     return traces
 
 
-def _trace_points(m, sens, zoom):
+def _trace_points(m, zoom):
     """Points chauds / froids (carte.html) : couleur = valeur, rayon fixe en mètres, les plus chauds dessus."""
-    if sens in ("1", "2") and "sens" in m:
-        m = m[m["sens"] == int(sens)]
     m = m.sort_values("lux")
     h = m["heure_locale"] if "heure_locale" in m else pd.Series(np.nan, index=m.index)
     cd = np.c_[m["lux"], m["sens"] if "sens" in m else np.ones(len(m)),
@@ -365,7 +337,7 @@ def _trace_points(m, sens, zoom):
                                      "<extra></extra>")
 
 
-def carte(data, mode, couleur, couches, sdal, selection, fond, sens, vue, uirev):
+def carte(data, mode, couleur, couches, sdal, selection, fond, vue, uirev):
     """Figure complète + index des traces (pour les mises à jour partielles par Patch)."""
     m = data["mesures"]
     vue = vue or {}
@@ -383,31 +355,20 @@ def carte(data, mode, couleur, couches, sdal, selection, fond, sens, vue, uirev)
 
     elif mode == "hex" and data["hex"] is not None:
         gj, p = data["hex"]
-        seuil = p["classe"].map(lambda c: sdal.get(c, T.CLASSES[c][2]))
-        p = p.assign(seuil=seuil)
-        survol = ("<b>%{customdata[0]:.1f} lx</b> (moyenne des deux sens)<br>%{customdata[8]}"
-                  "<br>Médiane : %{customdata[1]:.1f} lx · U0 : %{customdata[2]:.2f} · passages : %{customdata[3]}"
-                  "<br>Seuil (%{customdata[7]}) : %{customdata[6]} lx<extra></extra>")
-        sens_txt = [f"sens 1 : {fmt(a, ' lx')} · sens 2 : {fmt(b, ' lx')}" for a, b in zip(p["E_sens1"], p["E_sens2"])]
-        cd = np.c_[p.reindex(columns=["E_moy", "E_med", "U0", "n_passages", "_lat", "_lon", "seuil"]).values,
-                   p["classe"].map(lambda c: T.CLASSES[c][0]).values, sens_txt]
-        if couleur == "eclairement":
-            fig.add_trace(go.Choroplethmap(
-                geojson=gj, locations=p["_id"], z=p["E_moy"].clip(0, LUX_MAX), colorscale=ECHELLE,
-                zmin=0, zmax=LUX_MAX, marker_line_width=0, marker_opacity=0.9,
-                colorbar=dict(title="lux", **BARRE_COULEUR), customdata=cd, hovertemplate=survol, name="Hexagones"))
-        else:
-            fig.add_trace(go.Choroplethmap(
-                geojson=gj, locations=p["_id"], z=(p["E_moy"] >= seuil).astype(int),
-                colorscale=[[0, ROUGE], [0.5, ROUGE], [0.5, VERT], [1, VERT]],
-                zmin=0, zmax=1, marker_line_width=0, marker_opacity=0.85,
-                colorbar=dict(tickvals=[0.25, 0.75], ticktext=["Non conforme", "Conforme"],
-                              **{**BARRE_COULEUR, "len": 0.35}),
-                customdata=cd, hovertemplate=survol, name="Conformité"))
+        # 6 champs : [E moy, E sens 1, E sens 2, passages, lat, lon] (pas de -> carte trop lourde à 1 m)
+        cd = p[["E_moy", "E_sens1", "E_sens2", "n_passages", "_lat", "_lon"]].round(
+            {"E_moy": 1, "E_sens1": 1, "E_sens2": 1, "_lat": 6, "_lon": 6}).astype(object)
+        cd = cd.where(cd.notna(), None).values
+        fig.add_trace(go.Choroplethmap(
+            geojson=gj, locations=p["_id"], z=p["E_moy"].clip(0, LUX_MAX).round(1), colorscale=ECHELLE,
+            zmin=0, zmax=LUX_MAX, marker_line_width=0, marker_opacity=0.95,
+            colorbar=dict(title="lux", **BARRE_COULEUR), customdata=cd, name="Hexagones de 1 m",
+            hovertemplate="<b>%{customdata[0]} lx</b> (moyenne des deux sens)<br>sens 1 : %{customdata[1]} lx · "
+                          "sens 2 : %{customdata[2]} lx<br>%{customdata[3]} passage(s)<extra></extra>"))
 
     elif mode == "points":
         meta["points"] = [len(fig.data)]
-        fig.add_trace(_trace_points(m, sens, zoom))
+        fig.add_trace(_trace_points(m, zoom))
 
     # couches toujours présentes : les interrupteurs ne changent que leur visibilité (Patch)
     lum = data["luminaires"]
@@ -735,14 +696,11 @@ app.layout = html.Div(className="page", children=[
                          "value": "points"}], "Vue"),
                     segmente("couleur-carte", "eclairement", [
                         {"label": "Éclairement", "value": "eclairement"},
-                        {"label": "Conformité SDAL", "value": "conformite"}], "Couleur"),
+                        {"label": "Conformité SDAL", "value": "conformite"}], "Couleur (tronçons)"),
                     segmente("lissage", "apres", [
                         {"label": [html.I(className="bi bi-soundwave me-1"), "Avant"], "value": "avant"},
                         {"label": [html.I(className="bi bi-activity me-1"), "Après lissage"], "value": "apres"}],
                         "Bruit"),
-                    segmente("sens", "tous", [
-                        {"label": "2 sens", "value": "tous"}, {"label": "Sens 1", "value": "1"},
-                        {"label": "Sens 2", "value": "2"}], "Sens (points)"),
                     segmente("fond", "sombre", [
                         {"label": [html.I(className="bi bi-moon-stars me-1"), "Sombre"], "value": "sombre"},
                         {"label": [html.I(className="bi bi-sun me-1"), "Clair"], "value": "clair"}], "Fond"),
@@ -963,17 +921,11 @@ def afficher(dossier, *valeurs):
                 f"{len(tr) - n_conf} sous leur seuil SDAL", coul(100 * n_conf / len(tr)),
                 barre=100 * n_conf / len(tr)),
         ]
-    if data["hex"] is not None:
-        p = data["hex"][1]
-        taux = float(100 * (p["E_moy"] >= p["classe"].map(lambda c: sdal.get(c, T.CLASSES[c][2]))).mean())
-        kpis.append(kpi("hexagon", "Hexagones conformes", fmt(taux, " %", 0),
-                        f"{fmt(len(p), dec=0)} hexagones de 10 m", coul(taux), barre=taux))
+    kpis.append(kpi("speedometer2", "Distance mesurée", fmt(k.get("dist_km"), " km"),
+                    f"en {fmt(k.get('duree_h'), ' h')}" if k.get("duree_h") else None, "info"))
     if k.get("n_lampadaires"):
         kpis.append(kpi("lightbulb", "Lampadaires estimés", fmt(k["n_lampadaires"], dec=0),
                         f"{fmt(k.get('puissance_tot_kw'), ' kW')} installés", "info"))
-    else:
-        kpis.append(kpi("speedometer2", "Distance mesurée", fmt(k.get("dist_km"), " km"),
-                        f"en {fmt(k.get('duree_h'), ' h')}" if k.get("duree_h") else None, "info"))
     if tr is not None and not tr.empty:
         kpis.append(kpi("arrow-left-right", "À repasser", f"{n_comp}",
                         "tronçons à double sens mesurés dans un seul sens", "warning" if n_comp else "success"))
@@ -988,33 +940,46 @@ def afficher(dossier, *valeurs):
 # la carte garde son zoom et ne clignote pas.
 @app.callback(Output("carte", "figure"), Output("carte-meta", "data"), Output("bandeau-lissage", "children"),
               Input("choix-rapport", "value"), Input("mode-carte", "value"), Input("couleur-carte", "value"),
-              Input("lissage", "value"), Input("sens", "value"), *SDAL_INPUTS,
+              Input("lissage", "value"), *SDAL_INPUTS,
               State("couches", "value"), State("selection", "data"), State("fond", "value"),
               State("vue", "data"), State("uirev", "data"))
-def afficher_carte(dossier, mode, couleur, lissage, sens, *reste):
+def afficher_carte(dossier, mode, couleur, lissage, *reste):
     *valeurs, couches, selection, fond, vue, uirev = reste
     if not dossier:
         return carte_vide("Aucune tournée analysée"), {}, None
     declencheur = str(ctx.triggered_id or "")
-    if declencheur.startswith("sdal-") and not (couleur == "conformite" and mode != "points"):
+    if mode != "troncons":
+        couleur = "eclairement"                                     # conformité : tronçons seulement
+    if declencheur.startswith("sdal-") and couleur != "conformite":
         return dash.no_update, dash.no_update, dash.no_update       # les seuils ne changent que la conformité
-    if declencheur == "sens" and mode != "points":
-        return dash.no_update, dash.no_update, dash.no_update
     if declencheur == "choix-rapport":
         vue, selection = {}, None                                    # nouvelle tournée : vue d'ensemble
     brut = lissage == "avant"
     data = charger(dossier, brut=brut)
-    if mode == "points" and couleur == "conformite":
-        couleur = "eclairement"
-    fig, meta = carte(data, mode, couleur, couches or [], sdal_de(valeurs), selection, fond, sens, vue, uirev)
-    bandeau = None
+    fig, meta = carte(data, mode, couleur, couches or [], sdal_de(valeurs), selection, fond, vue, uirev)
+    bandeau = []
+    if mode == "hex":
+        bandeau.append(html.Div([html.I(className="bi bi-zoom-in me-2"),
+                                 "Hexagones de 1 m : zoomez sur une rue pour les voir (une mesure tous les 2 m, "
+                                 "d'où les cellules espacées). Pour une vue d'ensemble : « Tronçons » ou "
+                                 "« Points chauds / froids »."], className="bandeau-lissage"))
     if brut:
         texte = ("Avant lissage : signal brut (médiane des 3 capteurs, sans filtre de Hampel ni suppression des pics "
                  "aberrants). Comparez avec « Après lissage ».")
         if not data["brut"]:
             texte = "Ce rapport ne contient pas le signal brut (colonne E_brut) : relancez l'analyse pour l'obtenir."
-        bandeau = html.Div([html.I(className="bi bi-soundwave me-2"), texte], className="bandeau-lissage")
-    return fig, meta, bandeau
+        bandeau.append(html.Div([html.I(className="bi bi-soundwave me-2"), texte], className="bandeau-lissage"))
+    return fig, meta, bandeau or None
+
+
+@app.callback(Output("couleur-carte", "options"), Output("couleur-carte", "value"),
+              Input("mode-carte", "value"), State("couleur-carte", "value"))
+def options_couleur(mode, valeur):
+    """La conformité SDAL ne concerne que les tronçons : option grisée pour les autres vues."""
+    tr = mode == "troncons"
+    options = [{"label": "Éclairement", "value": "eclairement"},
+               {"label": "Conformité SDAL", "value": "conformite", "disabled": not tr}]
+    return options, valeur if tr else "eclairement"
 
 
 @app.callback(Output("carte", "figure", allow_duplicate=True), Input("fond", "value"), prevent_initial_call=True)
@@ -1111,7 +1076,7 @@ def choisir_point(clic_carte, clics_deficit, cellule, cellule_q, dossier):
         cd = pt.get("customdata")
         if "lat" in pt and pt["lat"] is not None:
             lat, lon = pt["lat"], pt["lon"]
-        elif cd and len(cd) >= 6:                          # hexagone : centre dans customdata
+        elif cd and len(cd) == 6:                          # hexagone : centre dans customdata
             lat, lon = float(cd[4]), float(cd[5])
         else:
             return dash.no_update
@@ -1125,8 +1090,9 @@ def choisir_point(clic_carte, clics_deficit, cellule, cellule_q, dossier):
                        detail=f"{cd[1]:.0f} W estimés · côté {cd[4]} · pic {cd[5]:.0f} lx")
         elif isinstance(cd, list) and len(cd) == 3:                                # point chaud / froid
             sel.update(titre="Point de mesure", detail=f"{float(cd[0]):.1f} lx · sens {cd[1]} · {cd[2]}")
-        elif isinstance(cd, list) and len(cd) >= 9:                                # hexagone
-            sel.update(titre="Hexagone de 10 m", detail=f"{float(cd[0]):.1f} lx · {cd[8]}")
+        elif "lat" not in pt and isinstance(cd, list) and len(cd) == 6:            # hexagone
+            sel.update(titre="Hexagone de 1 m", detail=f"{fmt(cd[0], ' lx')} (sens 1 : {fmt(cd[1], ' lx')}, "
+                                                      f"sens 2 : {fmt(cd[2], ' lx')}) · {cd[3]} passage(s)")
         return sel
     tid, extra = None, None
     if isinstance(src, dict) and src.get("type") == "deficit":
