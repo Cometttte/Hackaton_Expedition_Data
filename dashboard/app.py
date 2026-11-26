@@ -838,6 +838,16 @@ def liens_rapport(dossier):
     return sortie + [[url_couche(data, c) for c in ("hexagones", "points")]]
 
 
+# « Lancer l'analyse » : la fenêtre se ferme et l'écran d'analyse s'affiche tout de suite, dans le navigateur
+# (sans attendre l'envoi du fichier au serveur) ; le callback d'envoi le retire à la fin (running)
+app.clientside_callback(
+    """function(n) { return n ? [false, {display: 'flex'}] : [window.dash_clientside.no_update,
+                                                            window.dash_clientside.no_update]; }""",
+    Output("fenetre-envoi", "is_open", allow_duplicate=True),
+    Output("voile-analyse", "style", allow_duplicate=True),
+    Input("btn-lancer", "n_clicks"), prevent_initial_call=True)
+
+
 # voile « Chargement de la tournée… » : affiché dès qu'une tournée est choisie, retiré quand les indicateurs
 # sont calculés ET que la carte a dessiné ses données (ou au bout de 15 s)
 app.clientside_callback(
