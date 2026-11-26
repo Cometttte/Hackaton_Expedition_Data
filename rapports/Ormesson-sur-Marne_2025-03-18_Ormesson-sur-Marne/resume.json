@@ -6,7 +6,7 @@
   "date_iso": "2025-03-18",
   "debut": "20h17",
   "fin": "23h38",
-  "genere": "26/11/2026 17h48",
+  "genere": "26/11/2026 21h35",
   "params": {
    "pas_m": 2.0,
    "vitesse_min": 0.5,
@@ -14,12 +14,6 @@
    "gap_passage_s": 20.0,
    "seuil_emoy_lx": 10.0,
    "heure_abaissement": 22.0,
-   "prominence_min_lx": 3.0,
-   "rayon_regroupement_m": 6.0,
-   "seuil_asym_cote": 0.04,
-   "accord_cote_min": 0.7,
-   "dist_laterale_m": 5.3,
-   "troncon_m": 100.0,
    "calage_auto": true,
    "decalage_long_m": 0.0,
    "latence_s": 0.0,
@@ -44,28 +38,8 @@
   "part_sup_seuil": 67.0,
   "part_sup50": 5.8,
   "part_sombre": 4.0,
-  "n_points": 1270,
-  "n_lampadaires": 1270,
-  "n_pics": 2089,
-  "n_gauche": 603,
-  "n_droite": 453,
-  "n_non_tranche": 214,
-  "n_troncons": 275,
-  "troncons": {
-   "gauche": 89,
-   "deux_cotes": 75,
-   "droite": 57,
-   "indetermine": 54
-  },
-  "n_multi": 385,
-  "cv_passages_med": 14.0,
   "cv_maille_med": 12.0,
-  "interdistance_med": 24.0,
-  "puissance_tot_kw": 127.4,
-  "puissance_tot_min_kw": 111.0,
-  "puissance_tot_max_kw": 174.0,
-  "conso_tot_kw": 140.0,
-  "energie_an_mwh": 574.0,
+  "n_multi": 2120,
   "n_pas_incoh": 3,
   "n_aberrants": 23,
   "capteur_gauche": "L3",
@@ -90,6 +64,7 @@
   "n_var_arret": 5,
   "part_aberrants": 1.604,
   "n_excursions": 1973,
+  "largeur_min_m": 1.84,
   "aberrants": [
    [
     "23h31:30",
@@ -97,7 +72,9 @@
     0.52,
     5.2,
     0.0,
-    "trop haut"
+    "trop haut",
+    48.776937,
+    2.536058
    ],
    [
     "23h32:13",
@@ -105,7 +82,9 @@
     0.73,
     6.0,
     6.0,
-    "trop haut"
+    "trop haut",
+    48.776952,
+    2.536074
    ],
    [
     "23h32:13",
@@ -113,7 +92,9 @@
     0.08,
     0.7,
     181.0,
-    "trop haut"
+    "trop haut",
+    48.776959,
+    2.536097
    ],
    [
     "22h01:24",
@@ -121,7 +102,9 @@
     0.64,
     1.6,
     7.0,
-    "trop bref"
+    "trop bref",
+    48.787216,
+    2.532395
    ],
    [
     "23h28:36",
@@ -129,7 +112,9 @@
     0.59,
     1.5,
     16.0,
-    "trop bref"
+    "trop bref",
+    48.781488,
+    2.530389
    ],
    [
     "20h43:52",
@@ -137,7 +122,9 @@
     1.75,
     1.6,
     16.0,
-    "trop bref"
+    "trop bref",
+    48.791856,
+    2.54931
    ],
    [
     "23h01:02",
@@ -145,7 +132,9 @@
     28.3,
     1.8,
     8.0,
-    "variation à l'arrêt"
+    "variation à l'arrêt",
+    48.781197,
+    2.512459
    ],
    [
     "22h30:04",
@@ -153,7 +142,9 @@
     1.41,
     0.0,
     13.0,
-    "variation à l'arrêt"
+    "variation à l'arrêt",
+    48.783375,
+    2.520843
    ],
    [
     "22h01:24",
@@ -161,7 +152,9 @@
     0.04,
     0.1,
     12.0,
-    "trop bref"
+    "trop bref",
+    48.787214,
+    2.532401
    ],
    [
     "22h16:49",
@@ -169,7 +162,9 @@
     0.37,
     1.3,
     13.0,
-    "trop bref"
+    "trop bref",
+    48.78092,
+    2.514633
    ],
    [
     "22h16:00",
@@ -177,7 +172,9 @@
     0.15,
     0.8,
     10.0,
-    "trop bref"
+    "trop bref",
+    48.782359,
+    2.516378
    ],
    [
     "23h24:04",
@@ -185,7 +182,9 @@
     0.26,
     1.8,
     11.0,
-    "trop bref"
+    "trop bref",
+    48.779488,
+    2.523271
    ],
    [
     "22h11:18",
@@ -193,7 +192,9 @@
     0.46,
     0.5,
     10.0,
-    "trop bref"
+    "trop bref",
+    48.783087,
+    2.519609
    ],
    [
     "23h41:28",
@@ -201,7 +202,9 @@
     0.53,
     1.8,
     7.0,
-    "trop bref"
+    "trop bref",
+    48.781442,
+    2.536987
    ],
    [
     "23h16:10",
@@ -209,7 +212,9 @@
     5.16,
     1.2,
     0.0,
-    "variation à l'arrêt"
+    "variation à l'arrêt",
+    48.779627,
+    2.532239
    ],
    [
     "21h01:13",
@@ -217,7 +222,9 @@
     3.82,
     1.5,
     9.0,
-    "variation à l'arrêt"
+    "variation à l'arrêt",
+    48.7894,
+    2.550224
    ],
    [
     "21h44:11",
@@ -225,7 +232,9 @@
     0.87,
     0.4,
     6.0,
-    "trop bref"
+    "trop bref",
+    48.791132,
+    2.554636
    ],
    [
     "20h49:03",
@@ -233,7 +242,9 @@
     0.11,
     0.8,
     5.0,
-    "trop bref"
+    "trop bref",
+    48.790349,
+    2.54783
    ],
    [
     "23h26:22",
@@ -241,7 +252,9 @@
     0.29,
     1.2,
     5.0,
-    "trop bref"
+    "trop bref",
+    48.77951,
+    2.524581
    ],
    [
     "23h16:38",
@@ -249,7 +262,9 @@
     0.13,
     0.7,
     0.0,
-    "trop bref"
+    "trop bref",
+    48.779869,
+    2.53044
    ],
    [
     "23h05:38",
@@ -257,7 +272,9 @@
     3.46,
     0.1,
     3.0,
-    "variation à l'arrêt"
+    "variation à l'arrêt",
+    48.780199,
+    2.52265
    ],
    [
     "21h31:06",
@@ -265,7 +282,9 @@
     0.11,
     1.0,
     2.0,
-    "trop bref"
+    "trop bref",
+    48.789927,
+    2.536961
    ],
    [
     "23h41:12",
@@ -273,7 +292,9 @@
     0.54,
     1.8,
     0.0,
-    "trop bref"
+    "trop bref",
+    48.781442,
+    2.536987
    ]
   ],
   "part_arret": 18.6,
@@ -355,108 +376,6 @@
   "decalage_m": 0.22,
   "latence_s": 0.33
  },
- "abaissement": {
-  "n": 34,
-  "ratio_med": 1.3,
-  "n_abaisses": 3,
-  "part_abaisses": 9.0,
-  "par_type": {
-   "blanc_2700": [
-    11,
-    1.53
-   ],
-   "sodium": [
-    23,
-    1.08
-   ]
-  }
- },
- "types": [
-  {
-   "type": "sodium",
-   "libelle": "Sodium haute pression (≈ 2 000 K)",
-   "n": 781,
-   "tcp": 2700.0,
-   "p_med": 108.0,
-   "p_tot_kw": 84.3,
-   "c_tot_kw": 94.5,
-   "fourchette": [
-    100,
-    150
-   ],
-   "E_pic": 29.9
-  },
-  {
-   "type": "blanc_2700",
-   "libelle": "Blanc chaud ≈ 2 700 K : LED 2 700 K ou iodures métalliques céramiques",
-   "n": 247,
-   "tcp": 2661.0,
-   "p_med": 104.0,
-   "p_tot_kw": 25.7,
-   "c_tot_kw": 27.7,
-   "fourchette": [
-    90,
-    140
-   ],
-   "E_pic": 33.5
-  },
-  {
-   "type": "led_3000",
-   "libelle": "Blanc ≈ 3 000 K : LED",
-   "n": 186,
-   "tcp": 2952.0,
-   "p_med": 69.0,
-   "p_tot_kw": 12.8,
-   "c_tot_kw": 12.8,
-   "fourchette": [
-    45,
-    90
-   ],
-   "E_pic": 28.8
-  },
-  {
-   "type": "blanc_neutre",
-   "libelle": "Blanc neutre 3 300 à 3 800 K : vapeur de mercure, iodures ou LED",
-   "n": 52,
-   "tcp": 3468.0,
-   "p_med": 78.0,
-   "p_tot_kw": 4.1,
-   "c_tot_kw": 4.5,
-   "fourchette": [
-    40,
-    100
-   ],
-   "E_pic": 20.8
-  },
-  {
-   "type": "blanc_froid",
-   "libelle": "Blanc froid > 3 800 K : LED 4 000 K ou iodures métalliques",
-   "n": 3,
-   "tcp": 4165.0,
-   "p_med": 122.0,
-   "p_tot_kw": 0.4,
-   "c_tot_kw": 0.4,
-   "fourchette": [
-    100,
-    140
-   ],
-   "E_pic": 8.1
-  },
-  {
-   "type": "inconnu",
-   "libelle": "Indéterminé (pas de mesure chromamètre exploitable)",
-   "n": 1,
-   "tcp": null,
-   "p_med": 95.0,
-   "p_tot_kw": 0.1,
-   "c_tot_kw": 0.1,
-   "fourchette": [
-    70,
-    150
-   ],
-   "E_pic": 82.6
-  }
- ],
  "hist": [
   [
    0.0,
@@ -1417,90 +1336,16 @@
    4.5
   ]
  ],
- "types_libelles": {
-  "sodium": "Sodium haute pression (≈ 2 000 K)",
-  "blanc_2700": "Blanc chaud ≈ 2 700 K : LED 2 700 K ou iodures métalliques céramiques",
-  "led_3000": "Blanc ≈ 3 000 K : LED",
-  "blanc_neutre": "Blanc neutre 3 300 à 3 800 K : vapeur de mercure, iodures ou LED",
-  "blanc_froid": "Blanc froid > 3 800 K : LED 4 000 K ou iodures métalliques",
-  "inconnu": "Indéterminé (pas de mesure chromamètre exploitable)"
- },
- "puissance_type": {
-  "sodium": [
-   108,
-   100,
-   150
-  ],
-  "blanc_2700": [
-   104,
-   90,
-   140
-  ],
-  "led_3000": [
-   69,
-   45,
-   90
-  ],
-  "blanc_neutre": [
-   78,
-   40,
-   100
-  ],
-  "blanc_froid": [
-   122,
-   100,
-   140
-  ],
-  "inconnu": [
-   95,
-   70,
-   150
-  ]
- },
- "heures_an": 4100,
- "validation": {
-  "lignes": [
-   [
-    "Nombre de lampadaires",
-    "1 270 estimés pour 1 264 supports à moins de 10 m de la trace dans l'inventaire ; 72 % des lampadaires estimés tombent sur un support (à 12 m près)"
-   ],
-   [
-    "Position le long de la voie",
-    "écart médian de 2,8 m avec l'inventaire, dont la position est elle-même imprécise"
-   ],
-   [
-    "Côté gauche / droite",
-    "juste dans 90 % des cas (737 lampadaires comparés)"
-   ],
-   [
-    "Un côté ou les deux, par tronçon de 100 m",
-    "juste pour 80 % des tronçons (195 comparés)"
-   ],
-   [
-    "Sodium ou source blanche",
-    "juste dans 84 % des cas ; 84 % des « LED 3 000 K » sont bien des LED"
-   ],
-   [
-    "Puissance d'un lampadaire",
-    "écart médian de 20 % (75 % des cas sous 29 %)"
-   ],
-   [
-    "Puissance totale",
-    "63,6 kW estimés pour 63,5 kW à l'inventaire sur les mêmes supports (étalonnage fait sur ces données : à recontrôler dans une autre commune)"
-   ]
-  ]
- },
  "temps": {
-  "lecture_tdms": 1.23,
-  "gnss": 0.34,
-  "interpolation": 0.06,
-  "filtrage": 1.36,
-  "calage": 0.47,
-  "spatialisation": 0.11,
-  "qualite": 0.03,
+  "lecture_tdms": 3.96,
+  "gnss": 0.45,
+  "interpolation": 0.05,
+  "filtrage": 1.27,
+  "calage": 0.41,
+  "spatialisation": 0.07,
+  "qualite": 0.02,
   "passages": 0.02,
-  "lampadaires": 2.39,
-  "exports": 0.39,
-  "total": 6.7
+  "exports": 0.53,
+  "total": 7.2
  }
 }

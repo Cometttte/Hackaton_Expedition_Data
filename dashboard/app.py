@@ -40,6 +40,8 @@ CARTE_H = 640
 # couleurs des types de lampe estimés par l'analyse (chromamètre)
 COUL_TYPES = {"sodium": "#ff9d2e", "blanc_2700": "#ffd27a", "led_3000": "#fff3c4", "blanc_neutre": "#d9f2ff",
               "blanc_froid": "#8fd3ff", "inconnu": "#8b949e"}
+# valeurs aberrantes retirées par le filtrage du bruit, couleur par motif
+COUL_MOTIFS = {"trop haut": "#ff3b3b", "trop bref": "#ff9f43", "variation à l'arrêt": "#c77dff"}
 # classes d'éclairement pour colorer les tronçons (lx)
 PALIERS = [0, 2, 5, 7.5, 10, 15, 20, 30, math.inf]
 COUL_PALIERS = ["#5a6bff", "#8a4dff", "#b543d6", "#d94a9c", "#ef6467", "#f8893f", "#fcb22a", "#f9e24c"]   # visible sur fond sombre
@@ -103,7 +105,7 @@ def charger(dossier):
 @lru_cache(maxsize=4)
 def _charger(dossier, _mtime):
     d = Path(dossier)
-    sortie = {"resume": {}, "hex": None, "mesures": None, "supports": None, "luminaires": None,
+    sortie = {"resume": {}, "hex": None, "mesures": None, "supports": None, "luminaires": None, "aberrants": None,
               "troncons": None, "geoms": None, "erreur_troncons": None, "arbre_pts": None}
     if (d / "resume.json").exists():
         sortie["resume"] = json.loads((d / "resume.json").read_text(encoding="utf-8"))
@@ -147,7 +149,53 @@ def _charger(dossier, _mtime):
                              "lat": f["geometry"]["coordinates"][1]}
                             for f in gj["features"] if f.get("geometry")])
         sortie["luminaires"] = lum if not lum.empty else None
+    sortie["aberrants"] = aberrants_gps(sortie["resume"], sortie["mesures"])
     return sortie
+
+
+def _heure_dec(h):
+    """'23h31:30' -> 23.525 (heure locale décimale)."""
+    try:
+        hh, reste = str(h).split("h")
+        mm, ss = (reste.split(":") + ["0"])[:2]
+        return int(hh) + int(mm) / 60 + float(ss) / 3600
+    except ValueError:
+        return None
+
+
+def aberrants_gps(resume, m):
+    """Valeurs aberrantes retirées par le filtrage (resume.json -> qualite.aberrants), avec leur point GPS.
+    Si l'analyse fournit déjà lat / lon (8 champs), on les prend. Sinon on retrouve le point dans
+    mesures_pas2m.csv : parmi les mesures de la même seconde, celle dont le maximum brut (avant filtrage,
+    colonne Emax_brut) est le plus fort, c'est-à-dire là où le pic a été vu. Si le véhicule était arrêté
+    (pas de mesure à cette seconde), on prend la mesure la plus proche dans le temps (position approchée)."""
+    ab = (resume.get("qualite") or {}).get("aberrants") or []
+    if not ab:
+        return None
+    lignes = []
+    h_m = m["heure_locale"].to_numpy(float) if m is not None and "heure_locale" in m else None
+    emax = m["Emax_brut"].to_numpy(float) if m is not None and "Emax_brut" in m else None
+    for k, a in enumerate(ab):
+        heure, pic, duree, largeur, fond, motif = (list(a) + [None] * 6)[:6]
+        lat = lon = None
+        precision = "exacte (GPS de l'analyse)"
+        if len(a) >= 8 and a[6] is not None:
+            lat, lon = float(a[6]), float(a[7])
+        elif h_m is not None and _heure_dec(heure) is not None:
+            h = _heure_dec(heure)
+            dt = np.abs(((h_m - h + 12) % 24) - 12) * 3600            # écart en secondes (passage de minuit géré)
+            fen = np.where((dt <= 1.5))[0]
+            if len(fen):
+                i = fen[np.argmax(emax[fen])] if emax is not None else fen[np.argmin(dt[fen])]
+                precision = "à ± 5 m"
+            else:
+                i = int(np.argmin(dt))
+                precision = "approchée (véhicule à l'arrêt)"
+            lat, lon = float(m["lat"].iat[i]), float(m["lon"].iat[i])
+        lignes.append(dict(id=k, heure=heure, motif=motif, pic_lx=pic, fond_lx=fond, largeur_m=largeur, duree_s=duree,
+                           lat=lat, lon=lon, precision=precision))
+    df = pd.DataFrame(lignes)
+    return df if df["lat"].notna().any() else None
 
 
 def _densifier_tr(data, pas=8.0):
@@ -350,6 +398,18 @@ def carte(data, mode, couleur, couches, sdal, selection):
                 hovertemplate="💡 Luminaire détecté<br>Pic : %{customdata[0]:.0f} lx"
                               "<br>Détections : %{customdata[1]}<extra></extra>"))
 
+    ab = data["aberrants"]
+    if "ab" in couches and ab is not None:
+        for motif, g in ab.dropna(subset=["lat"]).groupby("motif"):
+            fig.add_trace(go.Scattermap(
+                lat=g["lat"], lon=g["lon"], mode="markers", name=f"⚠ Aberrant · {motif} ({len(g)})",
+                marker=dict(size=13, color=COUL_MOTIFS.get(motif, ROUGE), opacity=0.95),
+                customdata=g.reindex(columns=["motif", "pic_lx", "fond_lx", "largeur_m", "duree_s", "heure"])
+                .assign(_a="", _b="", _marque="aberrant").values,     # 9 champs : distinct des tronçons (7)
+                hovertemplate="<b>Valeur aberrante retirée</b> — %{customdata[0]}<br>Pic %{customdata[1]:.0f} lx "
+                              "(fond %{customdata[2]:.0f} lx) · largeur %{customdata[3]:.1f} m<br>%{customdata[5]}"
+                              "<br><i>clic : voir dans Street View</i><extra></extra>"))
+
     s = data["supports"]
     if "sus" in couches and s is not None and "suspect" in s and s["suspect"].any():
         sus = s[s["suspect"]]
@@ -435,6 +495,53 @@ def types_lampes(data):
                       title=dict(text=f"{fmt(k.get('n_lampadaires'), dec=0)} lampadaires estimés · "
                                       f"{fmt(k.get('puissance_tot_kw'), ' kW')} installés", font_size=13, x=0.01))
     return fig
+
+
+def bruit(data):
+    """Onglet « Bruit et valeurs aberrantes » : ce que le filtrage a corrigé et la liste des pics retirés,
+    chacun avec ses coordonnées GPS. Clic sur une ligne -> Street View à droite et carte centrée sur le point."""
+    q, k = data["resume"].get("qualite", {}), data["resume"].get("kpi", {})
+    ab = data["aberrants"]
+    if not q:
+        return html.P("Pas d'informations sur le bruit dans ce rapport.", className="text-muted")
+    par_motif = ab["motif"].value_counts().to_dict() if ab is not None else {}
+    pastille = lambda c: html.Span(style={"display": "inline-block", "width": "10px", "height": "10px",  # noqa: E731
+                                          "borderRadius": "50%", "background": c, "marginRight": "6px"})
+    intro = html.Div([
+        html.P([html.B(f"{fmt(k.get('n_aberrants'), dec=0)} valeurs aberrantes retirées"),
+                f" ({fmt(q.get('part_aberrants'), ' %', 2)} des mesures), remplacées par interpolation. "
+                f"Autres corrections : {fmt(q.get('part_negatifs'), ' %', 1)} de mesures négatives ramenées à 0, "
+                f"{fmt(q.get('part_pics'), ' %', 2)} de parasites sur un seul capteur (filtre de Hampel), "
+                f"{fmt(k.get('n_pas_incoh'), dec=0)} passages incohérents écartés (phares, vitrine)."],
+               className="small mb-2"),
+        html.Div([html.Span([pastille(COUL_MOTIFS.get(m_, ROUGE)), f"{n} {m_}"], className="me-3 small")
+                  for m_, n in par_motif.items()], className="mb-2"),
+        html.P([html.I(className="bi bi-cursor me-1"),
+                "Cliquez une ligne : Street View s'ouvre à droite sur le lieu du pic et la carte s'y centre. "
+                "Activez « Valeurs aberrantes » au-dessus de la carte pour les voir toutes."],
+               className="small text-muted mb-2"),
+    ])
+    if ab is None:
+        return intro
+    t = ab.assign(gps=[f"{a:.5f}, {b:.5f}" if pd.notna(a) else "–" for a, b in zip(ab["lat"], ab["lon"])])
+    t = t.astype(object).where(t.notna(), None)
+    cols = [("heure", "Heure"), ("motif", "Motif"), ("pic_lx", "Pic (lx)"), ("fond_lx", "Fond (lx)"),
+            ("largeur_m", "Largeur (m)"), ("gps", "Coordonnées GPS"), ("precision", "Position")]
+    return html.Div([intro, dash_table.DataTable(
+        id="table-aberrants", data=t[[c for c, _ in cols] + ["id"]].to_dict("records"),
+        columns=[{"name": n, "id": c} for c, n in cols], sort_action="native", page_size=10,
+        style_table={"overflowX": "auto", "minWidth": "100%"},
+        style_header={"backgroundColor": "#161b22", "color": "#e6edf3", "fontWeight": "600",
+                      "border": "none", "borderBottom": "1px solid #30363d"},
+        style_cell={"backgroundColor": "transparent", "color": "#c9d1d9", "border": "none",
+                    "borderBottom": "1px solid #21262d", "textAlign": "left", "padding": "7px 10px",
+                    "fontFamily": "Inter, system-ui, sans-serif", "fontSize": "13px", "cursor": "pointer"},
+        style_data_conditional=[
+            *[{"if": {"filter_query": f'{{motif}} = "{m_}"', "column_id": "motif"}, "color": c}
+              for m_, c in COUL_MOTIFS.items()],
+            {"if": {"column_id": "gps"}, "color": "#38d9f5", "fontFamily": "monospace"},
+            {"if": {"state": "active"}, "backgroundColor": "rgba(56,217,245,0.15)", "border": "1px solid #38d9f5"}],
+    )])
 
 
 def chronologie(data):
@@ -585,7 +692,8 @@ app.layout = html.Div(className="page", children=[
                     ], className="d-flex flex-wrap gap-2"),
                     dbc.Checklist(id="couches", value=["sus"], inline=True, switch=True, className="small",
                                   options=[{"label": "Lampadaires estimés", "value": "lum"},
-                                           {"label": "Supports suspects", "value": "sus"}]),
+                                           {"label": "Supports suspects", "value": "sus"},
+                                           {"label": "Valeurs aberrantes", "value": "ab"}]),
                 ], className="d-flex justify-content-between align-items-center flex-wrap gap-2")),
                 dbc.CardBody(dcc.Loading(dcc.Graph(id="carte", config={"scrollZoom": True, "displaylogo": False}),
                                          type="circle", color=AMBRE), className="p-0"),
@@ -624,6 +732,7 @@ app.layout = html.Div(className="page", children=[
                     dbc.Tab(label="Lampadaires", tab_id="lampes"),
                     dbc.Tab(label="Chronologie", tab_id="chrono"),
                     dbc.Tab(label="Qualité des données", tab_id="qualite"),
+                    dbc.Tab(label="Bruit et valeurs aberrantes", tab_id="bruit"),
                 ])),
                 dbc.CardBody([
                     html.Div(id="tableau"),
@@ -631,6 +740,7 @@ app.layout = html.Div(className="page", children=[
                     html.Div(dcc.Graph(id="lampes", config={"displayModeBar": False}), id="p-lampes"),
                     html.Div(dcc.Graph(id="chrono", config={"displayModeBar": False}), id="p-chrono"),
                     html.Div(id="qualite"),
+                    html.Div(id="bruit"),
                 ]),
             ])),
         ]),
@@ -744,7 +854,7 @@ def liens_rapport(dossier):
 
 
 ONGLETS = {"troncons": "tableau", "distrib": "p-distrib", "lampes": "p-lampes", "chrono": "p-chrono",
-           "qualite": "qualite"}
+           "qualite": "qualite", "bruit": "bruit"}
 
 
 @app.callback(*[Output(p, "style") for p in ONGLETS.values()], Input("onglets", "active_tab"))
@@ -755,12 +865,12 @@ def changer_onglet(onglet):
 # ------------------------------------------------------------------ CALLBACKS : AFFICHAGE
 @app.callback(Output("contexte", "children"), Output("kpis", "children"), Output("barres", "figure"),
               Output("distrib", "figure"), Output("lampes", "figure"), Output("chrono", "figure"),
-              Output("tableau", "children"), Output("qualite", "children"),
+              Output("tableau", "children"), Output("qualite", "children"), Output("bruit", "children"),
               Input("choix-rapport", "value"), *SDAL_INPUTS)
 def afficher(dossier, *valeurs):
     if not dossier:
         vide = carte_vide("Aucune tournée analysée — cliquez sur « Nouvelle tournée »", 360)
-        return None, [], vide, vide, vide, vide, None, None
+        return None, [], vide, vide, vide, vide, None, None, None
     sdal = sdal_de(valeurs)
     data = charger(dossier)
     meta = data["resume"].get("meta", {})
@@ -816,7 +926,7 @@ def afficher(dossier, *valeurs):
                         "tronçons à double sens mesurés dans un seul sens", "warning" if n_comp else "success"))
 
     return ([contexte, alerte], kpis, barres_deficit(tr), distribution(tr), types_lampes(data),
-            chronologie(data), tableau_troncons(tr), qualite(data))
+            chronologie(data), tableau_troncons(tr), qualite(data), bruit(data))
 
 
 @app.callback(Output("carte", "figure"), Output("i-sel", "data"),
@@ -834,8 +944,9 @@ def afficher_carte(dossier, mode, couleur, couches, *reste):
 # ------------------------------------------------------------------ CALLBACKS : STREET VIEW
 @app.callback(Output("selection", "data"),
               Input("carte", "clickData"), Input("barres", "clickData"), Input("table-troncons", "active_cell"),
+              Input("table-aberrants", "active_cell"),
               State("choix-rapport", "value"), prevent_initial_call=True)
-def choisir_point(clic_carte, clic_barre, cellule, dossier):
+def choisir_point(clic_carte, clic_barre, cellule, cellule_ab, dossier):
     if not dossier:
         return dash.no_update
     data = charger(dossier)
@@ -856,8 +967,20 @@ def choisir_point(clic_carte, clic_barre, cellule, dossier):
         elif isinstance(cd, list) and len(cd) == 8 and cd[7] == "lampe":   # lampadaire estimé
             titre = f"💡 Lampadaire estimé — {cd[0]}"
             detail = f"{cd[1]:.0f} W estimés · côté {cd[4]} · pic {cd[5]:.0f} lx"
+        elif isinstance(cd, list) and len(cd) == 9 and cd[8] == "aberrant":   # valeur aberrante retirée
+            titre = f"⚠ Valeur aberrante retirée — {cd[0]}"
+            detail = f"pic {cd[1]:.0f} lx (fond {cd[2]:.0f} lx) · largeur {cd[3]:.1f} m · {cd[5]}"
         return {"lat": lat, "lon": lon, "cap": cap_proche(data, lat, lon), "titre": titre,
                 "detail": detail, "centrer": False}
+    if src == "table-aberrants" and cellule_ab and data["aberrants"] is not None:
+        a = data["aberrants"].set_index("id").loc[cellule_ab.get("row_id")]
+        if pd.isna(a["lat"]):
+            return dash.no_update
+        lat, lon = float(a["lat"]), float(a["lon"])
+        return {"lat": lat, "lon": lon, "cap": cap_proche(data, lat, lon), "centrer": True,
+                "titre": f"⚠ Valeur aberrante retirée — {a['motif']}",
+                "detail": f"pic {a['pic_lx']:.0f} lx (fond {a['fond_lx']:.0f} lx) · largeur {a['largeur_m']:.1f} m · "
+                          f"{a['heure']} · position {a['precision']}"}
     if src == "barres" and clic_barre:
         tid = clic_barre["points"][0]["customdata"][0]
     elif src == "table-troncons" and cellule:
