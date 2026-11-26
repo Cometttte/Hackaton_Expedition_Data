@@ -10,3 +10,4 @@ dash-bootstrap-components>=2.0
 plotly>=6.0
 requests>=2.31
 flask>=3.0
+flask-compress>=1.14   # compression des réponses du dashboard
