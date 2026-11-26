@@ -55,13 +55,16 @@ window.getys = Object.assign({}, window.getys, (function () {
             POINTS.length = j;
         });
     }
-    // rendu canvas avec une tolérance de clic de 6 px : inutile de viser pile le trait de 4 px
+    // UN SEUL rendu canvas pour tous les calques (tronçons, hexagones, points, lampadaires, sélection), avec une
+    // tolérance de clic de 6 px. Avec Leaflet 1.9, deux canvas superposés se bloquent : seul celui du dessus
+    // reçoit les clics (corrigé dans Leaflet 2.0). Il devient le rendu par défaut de la carte dès sa création.
     let rendu = null;
     const renduTolerant = () => rendu || (rendu = L.canvas({tolerance: 6, padding: 0.5}));
     // carte Leaflet accessible (window.getysCarte) : utile pour le débogage et les tests
     (function attendreLeaflet() {
-        if (window.L && L.Map) { L.Map.addInitHook(function () { window.getysCarte = this; }); }
-        else { setTimeout(attendreLeaflet, 20); }
+        if (window.L && L.Map) {
+            L.Map.addInitHook(function () { this.options.renderer = renduTolerant(); window.getysCarte = this; });
+        } else { setTimeout(attendreLeaflet, 20); }
     })();
     // mémorise le point cliqué : il part avec clickData (Street View à l'endroit du clic)
     function retenirClic(feature, layer) {
@@ -76,7 +79,7 @@ window.getys = Object.assign({}, window.getys, (function () {
                 const e = etat(p, h);
                 color = e.conforme ? VERT : (e.incomplet ? ORANGE : ROUGE);
             }
-            return {color: color, weight: 4, opacity: 0.95, lineCap: 'round', renderer: renduTolerant()};
+            return {color: color, weight: 4, opacity: 0.95, lineCap: 'round'};
         },
         infoTroncon: function (feature, layer, context) {
             retenirClic(feature, layer);
@@ -99,6 +102,8 @@ window.getys = Object.assign({}, window.getys, (function () {
         pointChaud: function (feature, latlng) {
             const c = L.circleMarker(latlng, {radius: rayonPoints(), stroke: false, interactive: true,
                                               fillColor: rgb(feature.properties.E), fillOpacity: 0.6});
+            const p = feature.properties;
+            c.bindTooltip(() => `<b>${fmt(p.E)} lx</b><br>sens ${p.s} · ${p.h}`, {direction: 'top'});
             POINTS.push(c);
             suivreZoom();
             return c;
