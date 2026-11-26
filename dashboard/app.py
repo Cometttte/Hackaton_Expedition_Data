@@ -655,12 +655,7 @@ app.layout = html.Div(className="page", children=[
                        href=LIEN_HACKATHON, target="_blank", rel="noopener", className="logo-entreprise",
                        title="Bouygues Energies & Services"),
                 html.Div([html.H1("Clair-Obscur", className="titre mb-0"),
-                          html.Div(["Tableau de bord de l'éclairage public · ",
-                                    html.A([html.I(className="bi bi-trophy-fill me-1"), "Hackathon 2026 ",
-                                            html.I(className="bi bi-box-arrow-up-right")],
-                                           href=LIEN_HACKATHON, target="_blank", rel="noopener",
-                                           className="lien-hackathon"),
-                                    " · équipe ", html.B("Clair-Obscur")], className="sous-titre")]),
+                          html.Div("Tableau de bord de l'éclairage public", className="sous-titre")]),
             ], className="d-flex align-items-center gap-3")),
             dbc.Col(xs=12, md=6, lg=4, children=dcc.Dropdown(
                 id="choix-rapport", clearable=False, placeholder="Choisir une tournée…",
