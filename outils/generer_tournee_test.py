@@ -17,6 +17,12 @@ PC, IMU port C 5 Hz avec cap $PRDID, Calorimetre ~1 Hz) : getys_rapport.py le tr
         -> 10 passages A -> B et 5 passages B -> A sur l'itinéraire principal ; pour enchaîner deux passages
            dans le même sens, le véhicule revient au départ sans enregistrement GNSS (acquisition en pause) :
            l'analyse ignore ces repositionnements, les comptes restent exacts
+    ... --sens1 10 --sens2 5 --ponderations
+        -> pondérations connues pour vérifier l'algorithme des tronçons (véhicule sur l'axe : mêmes conditions
+           dans les deux sens) : sens 1 = passages alternés lents et lumineux (4 m/s, x1,2) / rapides et sombres
+           (12 m/s, x0,8), soit x1,0 par passage (x1,1 par échantillon brut à 50 Hz, neutralisé par le pas
+           de 2 m) ; sens 2 = x0,5. Attendu par tronçon :
+           E_sens2 / E_sens1 = 0,50 et E_moy / E_sens1 = 0,75 (moyenne des deux sens). Vérité dans verite.json
 """
 from __future__ import annotations
 
@@ -26,6 +32,7 @@ import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import json
 import sys
 
 import numpy as np
@@ -111,11 +118,11 @@ def polyligne(coords, chemin):
 
 
 # ------------------------------------------------------------------ cinématique
-def rouler(xy, t0, v_croisiere, rng, arret_fin=6.0):
+def rouler(xy, t0, v_croisiere, rng, arret_fin=6.0, variation=True):
     """Échantillonne un trajet à 50 Hz : positions de l'axe, cap, vitesse (accélération / freinage)."""
     s_pts = np.r_[0, np.cumsum(np.hypot(*np.diff(xy, axis=0).T))]
     L = s_pts[-1]
-    v_max = v_croisiere * rng.uniform(0.85, 1.15)
+    v_max = v_croisiere * (rng.uniform(0.85, 1.15) if variation else 1.0)
     acc = 1.5
     t_acc = v_max / acc
     d_acc = 0.5 * acc * t_acc ** 2
@@ -205,7 +212,8 @@ def prdid(cap):
 
 
 # ------------------------------------------------------------------ génération
-def generer(sortie: Path, n_passages: int, graine: int, A, B, sens1=None, sens2=None, jour="2026-11-20"):
+def generer(sortie: Path, n_passages: int, graine: int, A, B, sens1=None, sens2=None, jour="2026-11-20",
+            ponderations=False):
     rng = np.random.default_rng(graine)
     voisins, coords = graphe(A, B)
     na, nb = plus_proche(coords, *A), plus_proche(coords, *B)
@@ -261,7 +269,9 @@ def generer(sortie: Path, n_passages: int, graine: int, A, B, sens1=None, sens2=
 
     a, m_, j = (int(x) for x in jour.split("-"))
     t_gps0 = datetime(a, m_, j, 19, 0, 0, tzinfo=timezone.utc).timestamp()   # 20h00 heure locale
-    morceaux, t = [], t_gps0
+    morceaux, facteurs, t = [], [], t_gps0
+    PONDS = {"lent": (4.0, 1.2), "rapide": (12.0, 0.8), "sens2": (8.0, 0.5)}    # vitesse m/s, facteur d'éclairement
+    n_aller, programme = 0, []
     for quoi, aller in plan:
         if quoi == "detour":
             pre = polyligne(coords, principal[: i_det + 1])          # A -> départ du détour
@@ -271,12 +281,20 @@ def generer(sortie: Path, n_passages: int, graine: int, A, B, sens1=None, sens2=
             tt = t + np.arange(0, L / 9.0, 1 / FS)
             nan = np.full(tt.size, np.nan)
             morceaux.append((tt, nan, nan, nan, nan))
+            facteurs.append(np.ones(tt.size))
             t = tt[-1] + 1 / FS
             continue
         else:
             trajet = xy_p if aller else xy_p[::-1]
-        r = rouler(trajet, t, rng.uniform(7.5, 10.0), rng)
+        vitesse, facteur, variation = rng.uniform(7.5, 10.0), 1.0, True
+        if ponderations and quoi == "principal":
+            cle = ("lent" if n_aller % 2 == 0 else "rapide") if aller else "sens2"
+            n_aller += int(bool(aller))
+            (vitesse, facteur), variation = PONDS[cle], False
+            programme.append(dict(sens=1 if aller else 2, type=cle, vitesse_ms=vitesse, facteur=facteur))
+        r = rouler(trajet, t, vitesse, rng, variation=variation)
         morceaux.append(r)
+        facteurs.append(np.full(r[0].size, facteur))
         t = r[0][-1] + 1 / FS
     t_all = np.concatenate([m[0] for m in morceaux])
     x = np.concatenate([m[1] for m in morceaux])
@@ -285,7 +303,9 @@ def generer(sortie: Path, n_passages: int, graine: int, A, B, sens1=None, sens2=
     v = np.concatenate([m[4] for m in morceaux])
     rad = np.radians(cap)
     gx, gy = -np.cos(rad), np.sin(rad)                    # vecteur « gauche » du véhicule
-    xv, yv = x - VOIE * gx, y - VOIE * gy                 # voie de droite
+    voie = 0.0 if ponderations else VOIE                  # pondérations : sur l'axe, mêmes conditions dans les 2 sens
+    xv, yv = x - voie * gx, y - voie * gy                 # voie de droite
+    facteur = np.concatenate(facteurs)
 
     # --- luxmètres : chaque capteur à sa position latérale, bruit et aberrations
     L3 = {}
@@ -293,6 +313,7 @@ def generer(sortie: Path, n_passages: int, graine: int, A, B, sens1=None, sens2=
         sur = np.isfinite(xv)
         E = np.full(xv.shape, 0.6)
         E[sur] = eclairement((xv + dl * gx)[sur], (yv + dl * gy)[sur], lamps)
+        E = E * facteur                                   # pondération du passage (1 hors scénario de test)
         E = E * rng.normal(1.0, 0.025, E.size) + rng.normal(0, 0.15, E.size) - 0.25   # gain, bruit, offset
         L3[nom] = E
     n = t_all.size
@@ -364,6 +385,19 @@ def generer(sortie: Path, n_passages: int, graine: int, A, B, sens1=None, sens2=
             ChannelObject("Calorimetre", "Tcp", np.array(tcp)),
             ChannelObject("Calorimetre", "deltaUV", np.where(np.array(tcp) > 0, 0.0015, 0.0)),
         ])
+    if ponderations:
+        verite = dict(
+            scenario="pondérations connues (véhicule sur l'axe : mêmes conditions géométriques dans les deux sens)",
+            passages=programme,
+            attendu=dict(
+                sens1_par_passage=1.0,
+                sens1_par_echantillon_brut_50Hz=round((1.2 * 3 + 0.8 * 1) / 4, 3),  # neutralisé par le pas de 2 m
+                sens2=0.5, ratio_sens2_sur_sens1=0.5, ratio_Emoy_sur_sens1_moyenne_des_sens=0.75,
+                ratio_si_ponderation_par_nombre_de_passages=round((sens1 * 1.0 + sens2 * 0.5) / (sens1 + sens2), 3)),
+            note=("sens 1 = sens de dessin du tronçon OSM ou l'inverse : comparer max(E_sens) et min(E_sens). "
+                  "Les passages lents produisent 3x plus d'échantillons à 50 Hz, mais le ré-échantillonnage tous "
+                  "les 2 m de getys_analyse.py donne autant de points par mètre à chaque passage : attendu x1,0."))
+        (sortie.parent / "verite.json").write_text(json.dumps(verite, ensure_ascii=False, indent=2), encoding="utf-8")
     duree = (t_all[-1] - t_all[0]) / 60
     print(f"✓ {sortie}  ({sortie.stat().st_size / 1e6:.1f} Mo)")
     if par_sens:
@@ -385,10 +419,12 @@ def main():
     ap.add_argument("--sens1", type=int, default=None, help="passages A -> B (avec --sens2 : remplace --passages)")
     ap.add_argument("--sens2", type=int, default=None, help="passages B -> A")
     ap.add_argument("--date", default="2026-11-20", help="date de la tournée (AAAA-MM-JJ), 20h00 heure locale")
+    ap.add_argument("--ponderations", action="store_true",
+                    help="avec --sens1/--sens2 : pondérations connues pour vérifier l'algorithme des tronçons")
     a = ap.parse_args()
     c = COMMUNES[a.commune]
     sortie = Path(a.sortie) if a.sortie else RACINE / "donnees_test" / f"{c['nom']}.tdms"
-    generer(sortie, a.passages, a.graine, c["A"], c["B"], a.sens1, a.sens2, a.date)
+    generer(sortie, a.passages, a.graine, c["A"], c["B"], a.sens1, a.sens2, a.date, a.ponderations)
 
 
 if __name__ == "__main__":
