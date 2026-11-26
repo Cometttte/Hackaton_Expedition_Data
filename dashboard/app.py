@@ -501,9 +501,6 @@ def tableau_troncons(tr):
             ("n_passages", "Passages"), ("E_sens1", "E sens 1"), ("E_sens2", "E sens 2"),
             ("E_moy", "E moy. (lx)"), ("U0", "U0"), ("seuil", "Seuil"), ("etat", "Conforme")]
     return html.Div([
-        html.P("E moy. = moyenne des deux sens de circulation (chaque sens = moyenne de ses passages). "
-               "⚠️ : un seul sens mesuré sur une voie à double sens, à repasser. "
-               "Cliquez une ligne : la carte va sur le tronçon.", className="small text-muted"),
         dash_table.DataTable(
             id="table-troncons", data=r.to_dict("records"), columns=[{"name": n, "id": c} for c, n in cols],
             sort_action="native", filter_action="native", page_size=12, **STYLE_TABLE,
@@ -605,6 +602,16 @@ app.layout = html.Div(className="page", children=[
     dcc.Store(id="selection"), html.Div(id="defilement", hidden=True),
     dcc.Store(id="urls-prechargement"), html.Div(id="prechargement", hidden=True),
     html.Div(id="fond-vectoriel", hidden=True),
+    # voiles de chargement : ouverture d'une tournée / analyse d'une nouvelle tournée
+    html.Div(id="voile-chargement", className="voile", style={"display": "none"}, children=html.Div(
+        className="voile-boite", children=[html.Div(className="voile-anneau"),
+                                           html.Div("Chargement de la tournée…", className="voile-titre"),
+                                           html.Div("indicateurs, tronçons et carte", className="voile-detail")])),
+    html.Div(id="voile-analyse", className="voile", style={"display": "none"}, children=html.Div(
+        className="voile-boite", children=[html.Div(className="voile-anneau"),
+                                           html.Div("Analyse de la tournée en cours…", className="voile-titre"),
+                                           html.Div("lecture du .tdms, filtrage, lampadaires : environ 10 s",
+                                                    className="voile-detail")])),
     # --- barre du haut
     html.Header(className="entete", children=dbc.Container(fluid=True, children=dbc.Row(
         align="center", className="g-2", children=[
@@ -735,9 +742,6 @@ app.layout = html.Div(className="page", children=[
                 [html.I(className="bi bi-file-earmark-binary fs-3 d-block mb-1 text-warning"),
                  "Glissez le fichier ", html.B(".tdms"), " ou ", html.A("parcourir")])),
             html.Div(id="tdms-nom", className="mt-2 small"),
-            html.P("Seule entrée : le fichier .tdms. L'analyse (≈ 10 s) estime les lampadaires, puis le "
-                   "dashboard calcule la moyenne au tronçon (filaire OpenStreetMap) et les hexagones.",
-                   className="small text-muted mt-3 mb-0"),
         ]),
         dbc.ModalFooter([
             dbc.Button("Annuler", id="btn-annuler", color="secondary", outline=True),
@@ -775,7 +779,8 @@ def fichier_choisi(nom):
               Output("choix-rapport", "value"), Output("fenetre-envoi", "is_open", allow_duplicate=True),
               Input("btn-lancer", "n_clicks"),
               State("upload", "contents"), State("upload", "filename"),
-              State("choix-rapport", "value"), prevent_initial_call="initial_duplicate")
+              State("choix-rapport", "value"), prevent_initial_call="initial_duplicate",
+              running=[(Output("voile-analyse", "style"), {"display": "flex"}, {"display": "none"})])
 def envoyer(n_lancer, contenu, nom, actuel):
     msg = None
     dossier_retour = None
@@ -831,6 +836,30 @@ def liens_rapport(dossier):
         return sortie + [None]
     data = charger(dossier)
     return sortie + [[url_couche(data, c) for c in ("hexagones", "points")]]
+
+
+# voile « Chargement de la tournée… » : affiché dès qu'une tournée est choisie, retiré quand les indicateurs
+# sont calculés ET que la carte a dessiné ses données (ou au bout de 15 s)
+app.clientside_callback(
+    """function(dossier) {
+        // repère les données affichées AVANT le changement : le voile attend qu'elles soient remplacées
+        const m = window.getysCarte; window.__avantChargement = null;
+        if (m) m.eachLayer(l => { if (!window.__avantChargement && l.feature) window.__avantChargement = l.feature; });
+        return dossier ? {display: 'flex'} : {display: 'none'};
+    }""",
+    Output("voile-chargement", "style"), Input("choix-rapport", "value"))
+app.clientside_callback(
+    """async function(kpis) {
+        const t0 = Date.now();
+        const pret = () => {                       // la carte montre de NOUVELLES données
+            const m = window.getysCarte; let nouveau = false;
+            if (m) m.eachLayer(l => { if (l.feature && l.feature !== window.__avantChargement) nouveau = true; });
+            return nouveau;
+        };
+        while (!pret() && Date.now() - t0 < 15000) await new Promise(r => setTimeout(r, 100));
+        return {display: 'none'};
+    }""",
+    Output("voile-chargement", "style", allow_duplicate=True), Input("kpis", "children"), prevent_initial_call=True)
 
 
 # données des vues Hexagones / Points téléchargées en arrière-plan : elles s'ouvrent sans attente
