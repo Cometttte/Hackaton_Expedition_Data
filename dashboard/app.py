@@ -14,6 +14,7 @@ import math
 import os
 from functools import lru_cache
 from pathlib import Path
+from urllib.parse import quote, unquote
 
 import dash
 import dash_bootstrap_components as dbc
@@ -242,20 +243,33 @@ def avec_seuils(tr, sdal):
     return tr
 
 
-def point_le_plus_sombre(data, tid):
-    """Point de mesure le plus sombre (lissé) le long d'un tronçon -> (lat, lon, cap)."""
-    m = data["mesures"]
+def _mesures_proches(data, tid):
+    """Indices des mesures à moins de 15 m de l'axe d'un tronçon."""
     x, y = TO93.transform(*data["geoms"][tid])
     x, y = np.asarray(x), np.asarray(y)
     dd = np.r_[0, np.cumsum(np.hypot(np.diff(x), np.diff(y)))]
     s = np.arange(0, dd[-1] + 1e-9, 4.0)
-    proches = sorted(set().union(*data["arbre_pts"].query_ball_point(
-        np.c_[np.interp(s, dd, x), np.interp(s, dd, y)], r=T.RAYON_M)))
+    return set().union(*data["arbre_pts"].query_ball_point(
+        np.c_[np.interp(s, dd, x), np.interp(s, dd, y)], r=T.RAYON_M))
+
+
+def point_le_plus_sombre(data, *tids):
+    """Point de mesure le plus sombre (lissé) le long d'un ou plusieurs tronçons -> (lat, lon, cap, lux)."""
+    proches = sorted(set().union(*(_mesures_proches(data, t) for t in tids)))
     if not proches:
-        return float(np.interp(dd[-1] / 2, dd, data["geoms"][tid][1])), \
-            float(np.interp(dd[-1] / 2, dd, data["geoms"][tid][0])), 0.0
-    p = m.iloc[proches].sort_values("lux_lisse").iloc[0]
-    return float(p["lat"]), float(p["lon"]), float(p.get("cap", 0) or 0)
+        glon, glat = data["geoms"][tids[0]]
+        return float(np.mean(glat)), float(np.mean(glon)), 0.0, None
+    p = data["mesures"].iloc[proches].sort_values("lux_lisse").iloc[0]
+    return float(p["lat"]), float(p["lon"]), float(p.get("cap", 0) or 0), float(p["lux_lisse"])
+
+
+def zoom_pour(lats, lons, largeur_px=820, hauteur_px=CARTE_H):
+    """Zoom MapLibre qui fait tenir l'emprise (avec une marge) dans la carte."""
+    lat0 = float(np.mean(lats))
+    dx = (max(lons) - min(lons)) * 111320 * math.cos(math.radians(lat0))
+    dy = (max(lats) - min(lats)) * 110540
+    mpp = max(dx / largeur_px, dy / hauteur_px, 0.15) * 1.35
+    return float(np.clip(math.log2(40075016.686 * math.cos(math.radians(lat0)) / (mpp * 512)), 12.5, 17.5))
 
 
 def cap_proche(data, lat, lon):
@@ -467,7 +481,6 @@ def deficits_par_rue(tr, n=12):
                              incomplet=("a_completer", "any"), classe=("classe", lambda c: c.mode().iat[0]))
     g["E"] = g["e_lg"] / g["lg"]
     g["S"] = g["s_lg"] / g["lg"]
-    pire = t.sort_values("ratio").groupby("nom")["id"].first()
     g = g[g["lg_nc"] > 0].sort_values("score", ascending=False).head(n)
     if g.empty:
         return dbc.Alert([html.I(className="bi bi-check-circle me-2"), "Toutes les rues respectent leur seuil SDAL."],
@@ -476,7 +489,8 @@ def deficits_par_rue(tr, n=12):
     for rang, (nom, r) in enumerate(g.iterrows(), 1):
         pct = float(min(100, 100 * r["E"] / r["S"])) if r["S"] else 0
         coul = "danger" if pct < 50 else "warning" if pct < 100 else "success"
-        lignes.append(html.Button(id={"type": "deficit", "index": str(pire[nom])}, n_clicks=0,
+        # id ASCII : avec des accents, Dash ne retrouve pas la valeur du bouton cliqué (ctx.triggered)
+        lignes.append(html.Button(id={"type": "deficit", "index": quote(str(nom))}, n_clicks=0,
                                   className="ligne-deficit", children=[
             html.Div(f"{rang}", className="deficit-rang"),
             html.Div(className="deficit-corps", children=[
@@ -494,7 +508,7 @@ def deficits_par_rue(tr, n=12):
         ]))
     return html.Div([
         html.Div("Classement par déficit cumulé (longueur × écart au seuil). Cliquez une rue : la carte "
-                 "va sur son tronçon le plus sombre.", className="small text-muted mb-2"),
+                 "la cadre en entier et surligne tous ses tronçons.", className="small text-muted mb-2"),
         html.Div(lignes, className="liste-deficits"),
     ])
 
@@ -1047,7 +1061,7 @@ def suivre_vue(relayout, meta, vue):
 # ------------------------------------------------------------------ CALLBACKS : SÉLECTION -> CARTE + STREET VIEW
 def _selection_troncon(data, tid, titre_extra=None):
     r = data["troncons"].set_index("id").loc[tid]
-    lat, lon, cap = point_le_plus_sombre(data, tid)
+    lat, lon, cap, _ = point_le_plus_sombre(data, tid)
     glon, glat = data["geoms"][tid]
     detail = (f"point le plus sombre · tronçon {fmt(r['E_moy'], ' lx')} "
               f"(sens 1 : {fmt(r['E_sens1'], ' lx')}, sens 2 : {fmt(r['E_sens2'], ' lx')})")
@@ -1058,6 +1072,29 @@ def _selection_troncon(data, tid, titre_extra=None):
             "tid": tid, "tr_lat": list(glat), "tr_lon": list(glon),
             "c_lat": float(np.mean(glat)), "c_lon": float(np.mean(glon)),
             "zoom": 17.2 if lg < 80 else 16.6 if lg < 180 else 16.0}
+
+
+def _selection_rue(data, nom):
+    """Toute la rue : tronçons surlignés, carte cadrée sur la rue, Street View au point le plus sombre."""
+    tr = data["troncons"]
+    rue = tr[tr["nom"] == nom]
+    if rue.empty:
+        return dash.no_update
+    tr_lat, tr_lon = [], []
+    for tid in rue["id"]:
+        glon, glat = data["geoms"][tid]
+        tr_lat += list(glat) + [None]; tr_lon += list(glon) + [None]
+    lats = [v for v in tr_lat if v is not None]
+    lons = [v for v in tr_lon if v is not None]
+    lat, lon, cap, e_min = point_le_plus_sombre(data, *rue["id"])
+    lg = float(rue["longueur_m"].sum())
+    e = float((rue["E_moy"] * rue["longueur_m"]).sum() / lg)
+    return {"lat": lat, "lon": lon, "cap": cap, "titre": nom, "centrer": True, "tid": f"rue:{nom}",
+            "detail": f"rue entière : {len(rue)} tronçon(s) · {fmt(lg, ' m', 0)} · E moyen {fmt(e, ' lx')} · "
+                      f"Street View au point le plus sombre ({fmt(e_min, ' lx')})",
+            "tr_lat": tr_lat, "tr_lon": tr_lon,
+            "c_lat": (min(lats) + max(lats)) / 2, "c_lon": (min(lons) + max(lons)) / 2,
+            "zoom": zoom_pour(lats, lons)}
 
 
 @app.callback(Output("selection", "data"),
@@ -1095,7 +1132,9 @@ def choisir_point(clic_carte, clics_deficit, cellule, cellule_q, dossier):
     if isinstance(src, dict) and src.get("type") == "deficit":
         if not ctx.triggered or not ctx.triggered[0]["value"]:      # liste redessinée, pas un clic
             return dash.no_update
-        tid = src["index"]
+        if data["troncons"] is None:
+            return dash.no_update
+        return _selection_rue(data, unquote(src["index"]))
     elif src == "table-troncons" and cellule:
         tid = cellule.get("row_id")
     elif src == "table-qualite" and cellule_q and cellule_q.get("row_id"):
