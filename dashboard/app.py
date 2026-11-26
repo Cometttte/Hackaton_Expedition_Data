@@ -45,19 +45,37 @@ LIEN_HACKATHON = "https://www.bouygues-es.fr"                                # H
 # Fonds de carte (tuiles raster, gratuites, sans clé). Satellite : mêmes tuiles que carte.html (getys_rapport.py)
 ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/{}/MapServer/tile/{{z}}/{{y}}/{{x}}"
 ATTR_ESRI = "© Esri, HERE, Garmin, © OpenStreetMap contributors"
-FONDS = {   # (url, attribution, zoom natif max) — les tuiles raster CARTO demandent désormais une clé
-    "sombre": [(ESRI.format("Canvas/World_Dark_Gray_Base"), ATTR_ESRI, 16),
-               (ESRI.format("Canvas/World_Dark_Gray_Reference"), "", 16)],
-    "clair": [(ESRI.format("Canvas/World_Light_Gray_Base"), ATTR_ESRI, 16),
-              (ESRI.format("Canvas/World_Light_Gray_Reference"), "", 16)],
-    "satellite": [(ESRI.format("World_Imagery"), "Imagerie © Esri, Maxar, Earthstar Geographics", 19),
-                  (ESRI.format("Reference/World_Boundaries_and_Places"), "", 19)],
+OSM = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+ATTR_OSM = "© contributeurs OpenStreetMap"
+ZOOM_BASCULE = 16.5      # au-delà, les fonds gris Esri n'ont plus de tuiles (zoom natif 16) : relais OSM en gris
+ZOOM_MAX = 19            # zoom natif max des tuiles OSM et de l'imagerie satellite : carte nette jusque-là
+# Chaque calque : (url, attribution, zoom natif max, zoom min, zoom max, classe CSS). Les tuiles raster CARTO
+# demandent désormais une clé ; Esri gris pour la vue d'ensemble, puis OpenStreetMap passé en gris par un
+# filtre CSS (assets/style.css) pour rester net à l'échelle de la rue.
+FONDS = {
+    "sombre": [(ESRI.format("Canvas/World_Dark_Gray_Base"), ATTR_ESRI, 16, 0, ZOOM_BASCULE, ""),
+               (ESRI.format("Canvas/World_Dark_Gray_Reference"), "", 16, 0, ZOOM_BASCULE, ""),
+               (OSM, ATTR_OSM, 19, ZOOM_BASCULE, ZOOM_MAX, "tuiles-osm-sombre")],
+    "clair": [(ESRI.format("Canvas/World_Light_Gray_Base"), ATTR_ESRI, 16, 0, ZOOM_BASCULE, ""),
+              (ESRI.format("Canvas/World_Light_Gray_Reference"), "", 16, 0, ZOOM_BASCULE, ""),
+              (OSM, ATTR_OSM, 19, ZOOM_BASCULE, ZOOM_MAX, "tuiles-osm-clair")],
+    "satellite": [(ESRI.format("World_Imagery"), "Imagerie © Esri, Maxar, Earthstar Geographics", 19, 0, ZOOM_MAX, ""),
+                  (ESRI.format("Reference/World_Boundaries_and_Places"), "", 19, 0, ZOOM_MAX, "")],
 }
 
 
 def tuiles(fond):
-    """Au-delà du zoom natif, Leaflet agrandit les dernières tuiles au lieu d'afficher « pas de données »."""
-    return [dl.TileLayer(url=u, attribution=a, maxZoom=21, maxNativeZoom=z) for u, a, z in FONDS[fond]]
+    """Fonds nets à tous les zooms : chaque source n'est affichée que là où elle a de vraies tuiles."""
+    # id propre à chaque fond : le calque est recréé (sinon Leaflet garde la tuile OSM sans changer son filtre).
+    # Haute résolution (écrans Retina) : detectRetina charge les tuiles du zoom suivant à demi-taille, donc 4x plus
+    # de pixels. Seulement là où ce zoom existe (OSM, satellite : 19) ; le zoom natif est alors abaissé d'un cran
+    # pour que la tuile demandée (zoom + 1) reste disponible. Pas sur les fonds gris Esri (zoom natif 16).
+    calques = []
+    for i, (u, a, nz, zmin, zmax, cl) in enumerate(FONDS[fond]):
+        retina = nz >= 19
+        calques.append(dl.TileLayer(id=f"tuiles-{fond}-{i}", url=u, attribution=a, minZoom=zmin, maxZoom=zmax,
+                                    maxNativeZoom=nz - 1 if retina else nz, detectRetina=retina, className=cl))
+    return calques
 
 
 # Charte Bouygues Energies & Services (palette relevée sur bouygues-es.fr)
@@ -702,9 +720,9 @@ app.layout = html.Div(className="page", children=[
                                            {"label": "Supports suspects", "value": "sus"}]),
                 ])),
                 html.Div(id="bandeau-lissage"),
-                dbc.CardBody(html.Div(className="carte-leaflet", children=[
+                dbc.CardBody(html.Div(id="cadre-carte", className="carte-leaflet fond-clair", children=[
                     dl.Map(id="carte", center=[48.785, 2.54], zoom=14.5, zoomSnap=0.25, zoomDelta=0.5,
-                           preferCanvas=True, maxZoom=21, style={"height": f"{CARTE_H}px", "width": "100%"},
+                           preferCanvas=True, maxZoom=ZOOM_MAX, style={"height": f"{CARTE_H}px", "width": "100%"},
                            children=[
                                dl.LayerGroup(id="fonds", children=tuiles("clair")),
                                dl.GeoJSON(id="geo-troncons", data=VIDE, style=fn("styleTroncon"),
@@ -1004,9 +1022,10 @@ def afficher_legende(mode, couleur, couches, dossier):
                    charger(dossier) if dossier else None)
 
 
-@app.callback(Output("fonds", "children"), Output("carte", "className"), Input("fond", "value"))
+@app.callback(Output("fonds", "children"), Output("cadre-carte", "className"), Input("fond", "value"))
 def changer_fond(fond):
-    return tuiles(fond), f"fond-{fond}"
+    # la classe va sur le bloc parent : dash-leaflet ne met pas à jour className de la carte après sa création
+    return tuiles(fond), f"carte-leaflet fond-{fond}"
 
 
 @app.callback(Output("carte", "viewport"), Input("choix-rapport", "value"))

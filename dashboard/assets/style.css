@@ -181,7 +181,8 @@ a { color: var(--bes-bleu); }
 /* --- carte Leaflet */
 .carte-leaflet { position: relative; }
 .carte-leaflet .leaflet-container { background: #E8EBF0; font-family: Roboto, Arial, sans-serif; }
-.carte-leaflet .fond-sombre.leaflet-container { background: #1b1e24; }
+.carte-leaflet.fond-sombre .leaflet-container { background: #161616; }   /* teinte des tuiles OSM inversées */
+.carte-leaflet.fond-satellite .leaflet-container { background: #1f2a1c; }
 .legende-carte { position: absolute; top: 10px; left: 54px; z-index: 500; pointer-events: none;
   background: rgba(255, 255, 255, 0.94); border: 1px solid var(--bord); border-radius: 6px; padding: 7px 10px;
   font-size: 0.74rem; color: var(--texte); display: flex; flex-direction: column; gap: 4px; min-width: 120px;
@@ -210,3 +211,13 @@ a { color: var(--bes-bleu); }
 .lien-hackathon .bi-trophy-fill { color: var(--bes-jaune); }
 .sous-titre b { color: #FFFFFF; }
 .pied a { color: var(--bes-bleu); font-weight: 600; }
+
+/* --- au-delà du zoom 16.5 : tuiles OpenStreetMap (nettes jusqu'au zoom 19) passées en gris
+   pour garder l'aspect neutre des fonds Esri sous les données */
+/* filtre sur chaque tuile (pas sur le calque entier : sinon les bords anticrénelés inversés dessinent une grille) */
+.tuiles-osm-clair img.leaflet-tile { filter: grayscale(1) brightness(1.06) contrast(0.88); }
+.tuiles-osm-sombre img.leaflet-tile { filter: grayscale(1) invert(1) brightness(0.82) contrast(0.92); }
+/* joints entre tuiles (écart sous-pixel de Leaflet, visible avec les tuiles Retina et les filtres) :
+   chaque tuile déborde d'un demi-pixel sur sa voisine */
+.leaflet-container img.leaflet-tile[style*="width: 128px"] { width: 128.5px !important; height: 128.5px !important; }
+.leaflet-container img.leaflet-tile[style*="width: 256px"] { width: 256.5px !important; height: 256.5px !important; }
