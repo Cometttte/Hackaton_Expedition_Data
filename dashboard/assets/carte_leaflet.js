@@ -24,7 +24,7 @@ window.getys = Object.assign({}, window.getys, (function () {
         for (let i = 0; i < MILIEUX.length; i++) if (v < PALIERS[i + 1]) return rgb(MILIEUX[i]);
         return rgb(40);
     }
-    const VERT = '#2fbf71', ROUGE = '#e5484d', ORANGE = '#ff9f43';
+    const VERT = '#00B894', ROUGE = '#E75113', ORANGE = '#F7A600';   // charte Bouygues E&S
     const TYPES = {sodium: '#ff8a2a', blanc_2700: '#ffd23f', led_3000: '#3b9bff', blanc_neutre: '#2ad4b0',
                    blanc_froid: '#b18cff', inconnu: '#a0a8b5'};
     const fmt = (v, d = 1) => v == null ? '–' : Number(v).toLocaleString('fr-FR',

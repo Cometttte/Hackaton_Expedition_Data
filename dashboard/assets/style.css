@@ -1,98 +1,125 @@
-/* Thème du dashboard Clair-Obscur (chargé automatiquement par Dash depuis assets/) */
+/* Thème du dashboard Clair-Obscur (chargé automatiquement par Dash depuis assets/)
+   Charte Bouygues Energies & Services (palette relevée sur bouygues-es.fr) :
+   bleu marine #1C2959 · marine foncé #00121D · bleu #005B90 · bleu canard #0093BB · bleu clair #63BEDD
+   orange #E75113 · vert #00B894 · jaune-orangé #F7A600 · texte #333333 · gris #F2F2F2 / #BFBFBF
+   Police : Roboto (Roboto Black pour les grands titres). */
 :root {
-  --fond: #0d1117;
-  --surface: #161b22;
-  --surface-2: #1c222b;
-  --bord: #2a313c;
-  --texte: #e6edf3;
-  --texte-2: #8b949e;
-  --ambre: #f5b301;
+  --bes-marine: #1C2959;
+  --bes-marine-fonce: #00121D;
+  --bes-bleu: #005B90;
+  --bes-canard: #0093BB;
+  --bes-bleu-clair: #63BEDD;
+  --bes-orange: #E75113;
+  --bes-vert: #00B894;
+  --bes-jaune: #F7A600;
 
-  /* composants Dash 4 (Dropdown, Slider, Input) en thème sombre */
-  --Dash-Fill-Interactive-Strong: #f5b301;
-  --Dash-Fill-Interactive-Weak: rgba(245, 179, 1, 0.10);
-  --Dash-Fill-Inverse-Strong: #161b22;
-  --Dash-Fill-Disabled: rgba(255, 255, 255, 0.06);
-  --Dash-Fill-Primary-Hover: rgba(255, 255, 255, 0.05);
-  --Dash-Fill-Primary-Active: rgba(255, 255, 255, 0.09);
-  --Dash-Text-Strong: #f0f6fc;
-  --Dash-Text-Primary: #e6edf3;
-  --Dash-Text-Weak: #8b949e;
-  --Dash-Text-Disabled: #6e7681;
-  --Dash-Stroke-Strong: #3d4654;
-  --Dash-Stroke-Weak: #2a313c;
+  --fond: #F2F2F2;
+  --surface: #FFFFFF;
+  --surface-2: #F7F8FA;
+  --bord: #DDE1E8;
+  --texte: #333333;
+  --texte-2: #6B7280;
+  --accent: var(--bes-canard);
+
+  /* composants Dash 4 (Dropdown, Slider, Input) */
+  --Dash-Fill-Interactive-Strong: var(--bes-canard);
+  --Dash-Fill-Interactive-Weak: rgba(0, 147, 187, 0.08);
+  --Dash-Fill-Inverse-Strong: #FFFFFF;
+  --Dash-Fill-Disabled: rgba(0, 0, 0, 0.05);
+  --Dash-Fill-Primary-Hover: rgba(28, 41, 89, 0.05);
+  --Dash-Fill-Primary-Active: rgba(28, 41, 89, 0.09);
+  --Dash-Text-Strong: var(--bes-marine);
+  --Dash-Text-Primary: #333333;
+  --Dash-Text-Weak: #6B7280;
+  --Dash-Text-Disabled: #9CA3AF;
+  --Dash-Stroke-Strong: #BFBFBF;
+  --Dash-Stroke-Weak: #DDE1E8;
 }
 
 body {
-  background: radial-gradient(1200px 500px at 10% -10%, rgba(245, 179, 1, 0.07), transparent 60%), var(--fond);
+  background: var(--fond);
   color: var(--texte);
-  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-family: Roboto, Arial, "Helvetica Neue", Helvetica, sans-serif;
 }
+h1, h2, h3, h4, h5, h6, .h6 { color: var(--bes-marine); }
 
-/* --- en-tête */
+/* --- en-tête : bandeau marine, comme le site Bouygues E&S */
 .entete {
   position: sticky; top: 0; z-index: 1030;
-  background: rgba(13, 17, 23, 0.85);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--bord);
+  background: var(--bes-marine);
+  border-bottom: 3px solid var(--bes-orange);
   padding: 10px 8px;
+  box-shadow: 0 2px 10px rgba(0, 18, 29, 0.25);
 }
 .logo {
-  width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 22px;
-  background: linear-gradient(135deg, rgba(245, 179, 1, 0.25), rgba(245, 179, 1, 0.05));
-  border: 1px solid rgba(245, 179, 1, 0.35);
+  width: 42px; height: 42px; border-radius: 10px; display: grid; place-items: center; font-size: 22px;
+  background: #FFFFFF; color: var(--bes-marine);
 }
-.titre { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em; color: var(--texte); }
-.sous-titre { font-size: 0.8rem; color: var(--texte-2); }
+.titre { font-size: 1.3rem; font-weight: 900; letter-spacing: 0.02em; text-transform: uppercase; color: #FFFFFF; }
+.sous-titre { font-size: 0.8rem; color: var(--bes-bleu-clair); }
+.entete .btn-outline-light { border-color: rgba(255, 255, 255, 0.55); color: #FFFFFF; }
+.entete .btn-outline-light:hover { background: #FFFFFF; color: var(--bes-marine); }
+.entete .btn-warning { background: var(--bes-orange); border-color: var(--bes-orange); color: #FFFFFF; }
+.entete .btn-warning:hover { background: #c94410; border-color: #c94410; color: #FFFFFF; }
+.choix-rapport.dash-dropdown { border-radius: 6px; background: #FFFFFF; }
 
 .contenu { padding: 18px 24px 8px; }
 .contexte { color: var(--texte-2); font-size: 0.88rem; margin-bottom: 14px; }
-.contexte i { color: var(--ambre); }
+.contexte i { color: var(--bes-canard); }
 
-/* --- sélecteur de tournée */
-.choix-rapport.dash-dropdown { border-radius: 10px; }
-.dash-slider-container input { background: var(--fond); color: var(--texte); border-color: var(--bord); border-radius: 6px; }
-.dash-slider-mark { color: var(--texte-2); font-size: 0.75rem; }
+/* couleurs d'état Bootstrap remappées sur la palette (lisibles sur fond clair) */
+.text-warning { color: #C77F00 !important; }
+.text-success { color: #00916F !important; }
+.text-danger { color: var(--bes-orange) !important; }
+.text-info { color: var(--bes-bleu) !important; }
+.progress-bar.bg-warning { background-color: var(--bes-jaune) !important; }
+.progress-bar.bg-success { background-color: var(--bes-vert) !important; }
+.progress-bar.bg-danger { background-color: var(--bes-orange) !important; }
+.progress-bar.bg-info { background-color: var(--bes-canard) !important; }
+.btn-outline-info { color: var(--bes-bleu); border-color: var(--bes-bleu); }
+a { color: var(--bes-bleu); }
 
 /* --- KPI */
 .kpi {
-  height: 100%; padding: 14px 16px; border-radius: 14px;
-  background: linear-gradient(180deg, var(--surface-2), var(--surface));
-  border: 1px solid var(--bord);
-  transition: border-color .15s, transform .15s;
+  height: 100%; padding: 14px 16px; border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--bord); border-top: 3px solid var(--bes-canard);
+  box-shadow: 0 1px 3px rgba(0, 18, 29, 0.06);
+  transition: box-shadow .15s, transform .15s;
 }
-.kpi:hover { border-color: #3d4654; transform: translateY(-1px); }
+.kpi:hover { box-shadow: 0 4px 14px rgba(0, 18, 29, 0.10); transform: translateY(-1px); }
 .kpi-icone { font-size: 1.05rem; }
-.kpi-titre { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--texte-2); font-weight: 600; }
+.kpi-titre { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--texte-2); font-weight: 700; }
 .kpi-valeur { font-size: 1.65rem; font-weight: 700; margin-top: 6px; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .kpi-detail { font-size: 0.76rem; color: var(--texte-2); margin-top: 4px; }
-.kpi-barre { height: 4px; margin-top: 8px; background: var(--bord); }
+.kpi-barre { height: 4px; margin-top: 8px; background: #E8EBF0; }
 
 /* --- cartes / blocs */
-.bloc { background: var(--surface); border: 1px solid var(--bord); border-radius: 14px; overflow: hidden; }
-.bloc > .card-header { background: transparent; border-bottom: 1px solid var(--bord); padding: 10px 14px; }
-.bloc > .card-footer { background: transparent; border-top: 1px solid var(--bord); }
-.bloc-titre { font-weight: 600; font-size: 0.92rem; }
-.bloc-titre i { color: var(--ambre); }
+.bloc { background: var(--surface); border: 1px solid var(--bord); border-radius: 6px; overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 18, 29, 0.06); }
+.bloc > .card-header { background: var(--surface); border-bottom: 1px solid var(--bord); padding: 10px 14px; }
+.bloc > .card-footer { background: var(--surface-2); border-top: 1px solid var(--bord); }
+.bloc-titre { font-weight: 700; font-size: 0.95rem; color: var(--bes-marine); }
+.bloc-titre i { color: var(--bes-orange); }
 
-/* boutons segmentés du mode de carte */
-#mode-carte .btn { border-color: var(--bord); color: var(--texte-2); font-size: 0.8rem; }
-#mode-carte .btn.active, #mode-carte .btn-check:checked + .btn {
-  background: var(--ambre); border-color: var(--ambre); color: #111; font-weight: 600;
+/* boutons segmentés (vue, couleur, bruit, fond) */
+.segmente .btn { border-color: var(--bord); color: var(--texte-2); font-size: 0.8rem; background: #FFFFFF; }
+.segmente .btn:hover { color: var(--bes-marine); background: var(--surface-2); }
+.segmente .btn.active, .segmente .btn-check:checked + .btn {
+  background: var(--bes-marine); border-color: var(--bes-marine); color: #FFFFFF; font-weight: 600;
 }
-#mode-carte .form-check { padding: 0; margin: 0; }
-.form-switch .form-check-input:checked { background-color: var(--ambre); border-color: var(--ambre); }
+.segmente .btn-check:disabled + .btn { opacity: 0.45; }
+.segmente .form-check { padding: 0; margin: 0; }
+.form-switch .form-check-input:checked { background-color: var(--bes-canard); border-color: var(--bes-canard); }
+.input-group-text { background: var(--surface-2); border-color: var(--bord); color: var(--texte-2); }
+.form-control { background: #FFFFFF; border-color: var(--bord); color: var(--texte); }
+.form-control:focus { border-color: var(--bes-canard); box-shadow: 0 0 0 3px rgba(0, 147, 187, 0.15); }
 
 /* onglets */
 .card-header-tabs .nav-link { color: var(--texte-2); border: none; font-size: 0.88rem; }
+.card-header-tabs .nav-link:hover { color: var(--bes-marine); }
 .card-header-tabs .nav-link.active {
-  background: transparent; color: var(--texte); border-bottom: 2px solid var(--ambre); font-weight: 600;
-}
-
-/* curseur du seuil */
-.badge-seuil {
-  background: rgba(245, 179, 1, 0.15); color: var(--ambre); border: 1px solid rgba(245, 179, 1, 0.4);
-  border-radius: 999px; padding: 2px 10px; font-weight: 700; font-size: 0.9rem; font-variant-numeric: tabular-nums;
+  background: transparent; color: var(--bes-marine); border-bottom: 3px solid var(--bes-orange); font-weight: 700;
 }
 
 /* tableaux */
@@ -102,9 +129,13 @@ body {
 
 /* fenêtre d'envoi */
 .modal-content { background: var(--surface); border: 1px solid var(--bord); }
-.modal-header, .modal-footer { border-color: var(--bord); }
+.modal-header { background: var(--bes-marine); color: #FFFFFF; }
+.modal-header .modal-title { color: #FFFFFF; }
+.modal-header .btn-close { filter: invert(1); }
+.modal-footer { border-color: var(--bord); }
+.modal-footer .btn-warning { background: var(--bes-orange); border-color: var(--bes-orange); color: #FFFFFF; }
 
-.pied { color: #5c6570; font-size: 0.75rem; text-align: center; padding: 22px 0 10px; }
+.pied { color: var(--texte-2); font-size: 0.75rem; text-align: center; padding: 22px 0 10px; }
 
 @media (max-width: 576px) {
   .contenu { padding: 14px 16px 8px; }
@@ -112,66 +143,60 @@ body {
 }
 
 /* --- Street View intégré */
-.sv-cadre { aspect-ratio: 16 / 10; background: #0b0e13; border-bottom: 1px solid var(--bord); }
+.sv-cadre { aspect-ratio: 16 / 10; background: #E8EBF0; border-bottom: 1px solid var(--bord); }
 .sv-iframe { width: 100%; height: 100%; border: 0; display: block; }
 .sv-vide { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
   color: var(--texte-2); font-size: 0.85rem; text-align: center; padding: 16px; }
-.sv-vide i { color: var(--ambre); }
+.sv-vide i { color: var(--bes-canard); }
 .sv-legende { padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; }
 .sv-legende:empty { display: none; }
-
-/* boutons segmentés (mode / couleur de la carte) */
-.segmente .btn { border-color: var(--bord); color: var(--texte-2); font-size: 0.8rem; }
-.segmente .btn.active, .segmente .btn-check:checked + .btn {
-  background: var(--ambre); border-color: var(--ambre); color: #111; font-weight: 600;
-}
-.segmente .form-check { padding: 0; margin: 0; }
-.input-group-text { background: var(--surface-2); border-color: var(--bord); color: var(--texte-2); }
-.form-control { background: var(--fond); border-color: var(--bord); color: var(--texte); }
-.form-control:focus { background: var(--fond); color: var(--texte); border-color: var(--ambre); box-shadow: none; }
+.sv-legende .fw-semibold { color: var(--bes-marine); }
 
 /* --- barre d'outils de la carte */
 .barre-outils { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 16px; }
 .outil { display: flex; flex-direction: column; gap: 3px; }
-.outil-titre { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--texte-2); font-weight: 600; }
+.outil-titre { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--texte-2); font-weight: 700; }
 .outil-couches { margin-left: auto; display: flex; flex-direction: column; gap: 2px; }
 .outil-couches .form-check { margin: 0; }
-.bandeau-lissage { background: rgba(245, 179, 1, 0.10); border-bottom: 1px solid rgba(245, 179, 1, 0.35);
-  color: #f3d27a; font-size: 0.8rem; padding: 6px 14px; }
+.bandeau-lissage { background: rgba(0, 147, 187, 0.08); border-bottom: 1px solid rgba(0, 147, 187, 0.3);
+  color: var(--bes-bleu); font-size: 0.8rem; padding: 6px 14px; }
 
 /* --- rues les plus en déficit */
 .liste-deficits { display: flex; flex-direction: column; gap: 6px; max-height: 470px; overflow-y: auto; padding-right: 4px; }
 .ligne-deficit { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: 28px 1fr auto;
-  gap: 10px; align-items: center; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--bord);
-  background: var(--surface-2); transition: border-color .15s, background .15s; width: 100%; }
-.ligne-deficit:hover, .ligne-deficit:focus-visible { border-color: var(--ambre); background: #222934; }
+  gap: 10px; align-items: center; padding: 9px 12px; border-radius: 6px; border: 1px solid var(--bord);
+  background: var(--surface); transition: border-color .15s, background .15s; width: 100%; }
+.ligne-deficit:hover, .ligne-deficit:focus-visible { border-color: var(--bes-canard); background: rgba(0, 147, 187, 0.05); }
 .deficit-rang { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
-  font-size: 0.8rem; background: rgba(229, 72, 77, 0.15); color: #ff8c8f; }
-.deficit-nom { font-weight: 600; font-size: 0.9rem; color: var(--texte); }
+  font-size: 0.8rem; background: var(--bes-marine); color: #FFFFFF; }
+.deficit-nom { font-weight: 700; font-size: 0.9rem; color: var(--bes-marine); }
 .deficit-detail { font-size: 0.75rem; color: var(--texte-2); margin: 2px 0 5px; }
-.deficit-barre { height: 4px; background: var(--bord); }
+.deficit-barre { height: 4px; background: #E8EBF0; }
 .deficit-valeur { font-weight: 700; font-size: 1rem; font-variant-numeric: tabular-nums; }
 .deficit-seuil { font-size: 0.72rem; color: var(--texte-2); }
-.badge-type { font-size: 0.68rem; padding: 1px 7px; border-radius: 999px; background: var(--bord); color: var(--texte-2); }
-.badge-alerte { font-size: 0.68rem; padding: 1px 7px; border-radius: 999px; background: rgba(255, 159, 67, 0.15);
-  color: #ffb877; border: 1px solid rgba(255, 159, 67, 0.4); }
+.badge-type { font-size: 0.68rem; padding: 1px 7px; border-radius: 999px; background: #E8EBF0; color: var(--bes-marine); }
+.badge-alerte { font-size: 0.68rem; padding: 1px 7px; border-radius: 999px; background: rgba(247, 166, 0, 0.15);
+  color: #9A6700; border: 1px solid rgba(247, 166, 0, 0.5); }
 
 /* --- carte Leaflet */
 .carte-leaflet { position: relative; }
-.carte-leaflet .leaflet-container { background: #0b0e13; font-family: Inter, system-ui, sans-serif; }
-.carte-leaflet .fond-clair.leaflet-container { background: #f2f3f5; }
+.carte-leaflet .leaflet-container { background: #E8EBF0; font-family: Roboto, Arial, sans-serif; }
+.carte-leaflet .fond-sombre.leaflet-container { background: #1b1e24; }
 .legende-carte { position: absolute; top: 10px; left: 54px; z-index: 500; pointer-events: none;
-  background: rgba(13, 17, 23, 0.82); border: 1px solid var(--bord); border-radius: 8px; padding: 7px 10px;
-  font-size: 0.74rem; color: var(--texte); display: flex; flex-direction: column; gap: 4px; min-width: 120px; }
+  background: rgba(255, 255, 255, 0.94); border: 1px solid var(--bord); border-radius: 6px; padding: 7px 10px;
+  font-size: 0.74rem; color: var(--texte); display: flex; flex-direction: column; gap: 4px; min-width: 120px;
+  box-shadow: 0 2px 8px rgba(0, 18, 29, 0.12); }
 .legende-carte:empty { display: none; }
 .legende-carte .pastille { display: inline-block; width: 18px; height: 4px; border-radius: 2px; margin-right: 6px;
   vertical-align: middle; }
-.legende-carte .pastille.rond { width: 9px; height: 9px; border-radius: 50%; border: 1px solid #111; }
-.legende-carte .leg-titre { font-weight: 600; color: var(--texte-2); }
+.legende-carte .pastille.rond { width: 9px; height: 9px; border-radius: 50%; border: 1px solid #333; }
+.legende-carte .leg-titre { font-weight: 700; color: var(--bes-marine); }
 .legende-carte .rampe { width: 150px; height: 9px; border-radius: 3px; }
 .legende-carte .rampe-graduations { display: flex; justify-content: space-between; width: 150px; color: var(--texte-2); }
-.leaflet-tooltip { background: #161b22; color: #e6edf3; border: 1px solid #30363d; font-size: 12px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, .4); }
+.leaflet-tooltip { background: #FFFFFF; color: var(--texte); border: 1px solid var(--bord); border-left: 3px solid var(--bes-canard);
+  font-size: 12px; box-shadow: 0 4px 14px rgba(0, 18, 29, .18); }
+.leaflet-tooltip b { color: var(--bes-marine); }
 .leaflet-tooltip-top:before, .leaflet-tooltip-bottom:before, .leaflet-tooltip-left:before,
 .leaflet-tooltip-right:before { display: none; }
 .leaflet-control-attribution { font-size: 10px; }
+.leaflet-bar a { color: var(--bes-marine); }

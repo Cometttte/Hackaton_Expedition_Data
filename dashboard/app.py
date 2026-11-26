@@ -59,7 +59,11 @@ def tuiles(fond):
     return [dl.TileLayer(url=u, attribution=a, maxZoom=21, maxNativeZoom=z) for u, a, z in FONDS[fond]]
 
 
-VERT, ROUGE, ORANGE, AMBRE, CYAN = "#2fbf71", "#e5484d", "#ff9f43", "#f5b301", "#38d9f5"
+# Charte Bouygues Energies & Services (palette relevée sur bouygues-es.fr)
+MARINE, BLEU, CANARD, BLEU_CLAIR = "#1C2959", "#005B90", "#0093BB", "#63BEDD"
+VERT, ROUGE, ORANGE = "#00B894", "#E75113", "#F7A600"   # conforme / non conforme / un seul sens mesuré
+AMBRE = CANARD                                             # couleur d'accent des graphiques
+CYAN = "#00B5E2"                                           # sélection sur la carte
 CARTE_H = 640
 LUX_MAX = 50                                  # haut de l'échelle des lux (comme carte.html)
 
@@ -88,13 +92,13 @@ TO93 = Transformer.from_crs(4326, 2154, always_xy=True)
 TO84 = Transformer.from_crs(2154, 4326, always_xy=True)
 
 # Thème Plotly commun : fonds transparents, police du dashboard
-pio.templates["clair"] = go.layout.Template(pio.templates["plotly_dark"])
+pio.templates["clair"] = go.layout.Template(pio.templates["plotly_white"])
 pio.templates["clair"].layout.update(
     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(family="Inter, system-ui, sans-serif", color="#c9d1d9", size=12),
-    xaxis=dict(gridcolor="#2a313c", zerolinecolor="#2a313c"),
-    yaxis=dict(gridcolor="#2a313c", zerolinecolor="#2a313c"),
-    hoverlabel=dict(bgcolor="#161b22", bordercolor="#30363d", font_color="#e6edf3"),
+    font=dict(family="Roboto, Arial, sans-serif", color="#333333", size=12),
+    xaxis=dict(gridcolor="#E6E9EF", zerolinecolor="#DDE1E8", linecolor="#BFBFBF"),
+    yaxis=dict(gridcolor="#E6E9EF", zerolinecolor="#DDE1E8", linecolor="#BFBFBF"),
+    hoverlabel=dict(bgcolor="#FFFFFF", bordercolor=CANARD, font_color="#333333"),
 )
 pio.templates.default = "clair"
 BARRE_COULEUR = dict(thickness=12, x=0.99, xanchor="right", len=0.55, bgcolor="rgba(13,17,23,0.75)",
@@ -102,8 +106,8 @@ BARRE_COULEUR = dict(thickness=12, x=0.99, xanchor="right", len=0.55, bgcolor="r
 
 app = dash.Dash(__name__, title="Éclairage public", suppress_callback_exceptions=True,
                 compress=True,                    # réponses des callbacks compressées (flask-compress)
-                external_stylesheets=[dbc.themes.DARKLY, dbc.icons.BOOTSTRAP,
-                                      "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"])
+                external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP,
+                                      "https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap"])
 
 
 @app.server.route("/rapport/<path:chemin>")
@@ -366,7 +370,7 @@ def kpi(icone, titre, valeur, detail=None, couleur="light", barre=None):
 
 def carte_vide(msg, h=CARTE_H):
     fig = go.Figure()
-    fig.update_layout(annotations=[dict(text=msg, showarrow=False, font_size=15, font_color="#8b949e")],
+    fig.update_layout(annotations=[dict(text=msg, showarrow=False, font_size=15, font_color="#6B7280")],
                       xaxis_visible=False, yaxis_visible=False, height=h,
                       margin=dict(l=0, r=0, t=0, b=0))
     return fig
@@ -465,10 +469,10 @@ def distribution(tr):
         lib = f"{T.CLASSES[c][0]} ({len(sous)})"
         fig.add_trace(go.Box(x=sous["E_moy"], name=lib, boxpoints="all", jitter=0.4, pointpos=0,
                              marker=dict(size=4, color=AMBRE, opacity=0.6),
-                             line_color="#8b949e", fillcolor="rgba(139,148,158,0.08)", customdata=sous["nom"],
+                             line_color=MARINE, fillcolor="rgba(28,41,89,0.06)", customdata=sous["nom"],
                              hovertemplate="%{customdata}<br>%{x:.1f} lx<extra></extra>", orientation="h"))
         fig.add_trace(go.Scatter(x=[sous["seuil"].iat[0]] * 2, y=[lib, lib], mode="markers", showlegend=False,
-                                 marker=dict(symbol="line-ns", size=30, line=dict(width=3, color=AMBRE)),
+                                 marker=dict(symbol="line-ns", size=30, line=dict(width=3, color=ROUGE)),
                                  hovertemplate=f"seuil SDAL : {sous['seuil'].iat[0]} lx<extra></extra>"))
     fig.update_layout(height=360, margin=dict(l=10, r=10, t=10, b=30), showlegend=False,
                       xaxis_title="Éclairement moyen du tronçon (lx) — trait ambre : seuil SDAL")
@@ -503,7 +507,7 @@ def chronologie(data):
     t = pd.DataFrame(ts, columns=["h", "lux"])
     hh = t["h"].apply(lambda h: f"{int(h)}h{int(round((h % 1) * 60)) % 60:02d}")
     fig = go.Figure(go.Scatter(x=t["h"], y=t["lux"], mode="lines", line=dict(color=AMBRE, width=2),
-                               fill="tozeroy", fillcolor="rgba(245,179,1,0.12)", text=hh,
+                               fill="tozeroy", fillcolor="rgba(0,147,187,0.12)", text=hh,
                                hovertemplate="%{text} — %{y:.1f} lx<extra></extra>"))
     pas = list(range(int(t["h"].min()), int(t["h"].max()) + 2))
     fig.update_layout(height=360, margin=dict(l=10, r=10, t=10, b=30), yaxis_title="lux moyen (1 min)",
@@ -513,13 +517,15 @@ def chronologie(data):
 
 STYLE_TABLE = dict(
     style_table={"overflowX": "auto", "minWidth": "100%"},
-    style_header={"backgroundColor": "#161b22", "color": "#e6edf3", "fontWeight": "600",
-                  "border": "none", "borderBottom": "1px solid #30363d"},
-    style_filter={"backgroundColor": "#0d1117", "color": "#e6edf3"},
-    style_cell={"backgroundColor": "transparent", "color": "#c9d1d9", "border": "none",
-                "borderBottom": "1px solid #21262d", "textAlign": "left", "padding": "7px 10px",
-                "fontFamily": "Inter, system-ui, sans-serif", "fontSize": "13px", "cursor": "pointer",
+    style_header={"backgroundColor": MARINE, "color": "#FFFFFF", "fontWeight": "700",
+                  "border": "none", "borderBottom": "2px solid #E75113"},
+    style_filter={"backgroundColor": "#F7F8FA", "color": "#333333"},
+    style_cell={"backgroundColor": "transparent", "color": "#333333", "border": "none",
+                "borderBottom": "1px solid #E6E9EF", "textAlign": "left", "padding": "7px 10px",
+                "fontFamily": "Roboto, Arial, sans-serif", "fontSize": "13px", "cursor": "pointer",
                 "whiteSpace": "normal", "height": "auto"},
+    style_cell_conditional=[{"if": {"column_id": "nom"}, "minWidth": "190px", "fontWeight": "500"},
+                            {"if": {"column_id": "detail"}, "minWidth": "220px"}],
 )
 
 
@@ -543,8 +549,8 @@ def tableau_troncons(tr):
             id="table-troncons", data=r.to_dict("records"), columns=[{"name": n, "id": c} for c, n in cols],
             sort_action="native", filter_action="native", page_size=12, **STYLE_TABLE,
             style_data_conditional=[
-                {"if": {"filter_query": '{conforme} = false'}, "backgroundColor": "rgba(229,72,77,0.10)"},
-                {"if": {"state": "active"}, "backgroundColor": "rgba(56,217,245,0.15)", "border": "1px solid #38d9f5"}],
+                {"if": {"filter_query": '{conforme} = false'}, "backgroundColor": "rgba(231,81,19,0.08)"},
+                {"if": {"state": "active"}, "backgroundColor": "rgba(0,147,187,0.12)", "border": "1px solid #0093BB"}],
         ),
     ])
 
@@ -602,8 +608,8 @@ def qualite(data, tr):
             columns=[{"name": "Voie", "id": "nom"}, {"name": "Problème", "id": "probleme"},
                      {"name": "Détail", "id": "detail"}, {"name": "E moy. (lx)", "id": "E_moy"},
                      {"name": "Long. (m)", "id": "longueur_m"}], **STYLE_TABLE,
-            style_data_conditional=[{"if": {"state": "active"}, "backgroundColor": "rgba(56,217,245,0.15)",
-                                     "border": "1px solid #38d9f5"}]),
+            style_data_conditional=[{"if": {"state": "active"}, "backgroundColor": "rgba(0,147,187,0.12)",
+                                     "border": "1px solid #0093BB"}]),
     ])
 
 
@@ -643,9 +649,9 @@ app.layout = html.Div(className="page", children=[
     html.Header(className="entete", children=dbc.Container(fluid=True, children=dbc.Row(
         align="center", className="g-2", children=[
             dbc.Col(xs=12, lg=True, children=html.Div([
-                html.Div("💡", className="logo"),
+                html.Div(html.I(className="bi bi-lightbulb-fill"), className="logo"),
                 html.Div([html.H1("Clair-Obscur", className="titre mb-0"),
-                          html.Div("Tableau de bord de l'éclairage public", className="sous-titre")]),
+                          html.Div("Tableau de bord de l'éclairage public · relevés GETYS", className="sous-titre")]),
             ], className="d-flex align-items-center gap-3")),
             dbc.Col(xs=12, md=6, lg=4, children=dcc.Dropdown(
                 id="choix-rapport", clearable=False, placeholder="Choisir une tournée…",
@@ -682,7 +688,7 @@ app.layout = html.Div(className="page", children=[
                         {"label": [html.I(className="bi bi-soundwave me-1"), "Avant"], "value": "avant"},
                         {"label": [html.I(className="bi bi-activity me-1"), "Après lissage"], "value": "apres"}],
                         "Bruit"),
-                    segmente("fond", "sombre", [
+                    segmente("fond", "clair", [
                         {"label": [html.I(className="bi bi-moon-stars me-1"), "Sombre"], "value": "sombre"},
                         {"label": [html.I(className="bi bi-sun me-1"), "Clair"], "value": "clair"},
                         {"label": [html.I(className="bi bi-globe-europe-africa me-1"), "Satellite"],
@@ -696,7 +702,7 @@ app.layout = html.Div(className="page", children=[
                     dl.Map(id="carte", center=[48.785, 2.54], zoom=14.5, zoomSnap=0.25, zoomDelta=0.5,
                            preferCanvas=True, maxZoom=21, style={"height": f"{CARTE_H}px", "width": "100%"},
                            children=[
-                               dl.LayerGroup(id="fonds", children=tuiles("sombre")),
+                               dl.LayerGroup(id="fonds", children=tuiles("clair")),
                                dl.GeoJSON(id="geo-troncons", data=VIDE, style=fn("styleTroncon"),
                                           onEachFeature=fn("infoTroncon"), hideout={}),
                                dl.GeoJSON(id="geo-hex", data=VIDE, style=fn("styleHex"), onEachFeature=fn("infoHex")),
