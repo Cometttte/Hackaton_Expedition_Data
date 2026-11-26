@@ -1,0 +1,28 @@
+# Lancement : docker compose up --build -d   ->  dashboard sur http://localhost:8050
+services:
+  serveur:            # reçoit un .tdms et lance getys_rapport.py
+    build: .
+    command: ["flask", "--app", "dashboard/serveur", "run", "--host", "0.0.0.0", "--port", "5001"]
+    volumes:
+      - ./rapports:/app/rapports
+      - ./tdms_recus:/app/tdms_recus
+    ports:
+      - "5001:5001"   # (le port 5000 est pris par AirPlay sur macOS)
+    restart: unless-stopped
+
+  dashboard:
+    build: .
+    command: ["python", "dashboard/app.py"]
+    environment:
+      SERVER_URL: http://serveur:5001/upload
+      HOST: 0.0.0.0
+      PORT: "8050"
+      DEBUG: "0"
+    volumes:
+      - ./rapports:/app/rapports
+      - ./dashboard/voirie:/app/dashboard/voirie   # cache du filaire OpenStreetMap
+    ports:
+      - "8050:8050"
+    depends_on:
+      - serveur
+    restart: unless-stopped

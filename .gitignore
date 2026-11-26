@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Fichiers reçus par le serveur du dashboard
+tdms_recus/
+*.tdms
+*.tdms_index
+
+# Calculé par le dashboard à la première ouverture d'un rapport
+rapports/**/troncons.geojson

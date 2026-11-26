@@ -1,0 +1,11 @@
+.git
+.venv
+venv
+**/__pycache__
+*.pyc
+rapports
+tdms_recus
+archives_code
+*.tdms
+*.tdms_index
+*.xlsx

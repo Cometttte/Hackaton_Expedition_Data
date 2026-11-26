@@ -35,3 +35,20 @@ Si un rapport existe déjà pour la même tournée, il est déplacé dans `rappo
 7. Abaissement nocturne : pic d'un même lampadaire avant et après 22h.
 
 Le détail de chaque déduction, et la précision constatée sur Ormesson, sont dans EXPLICATION_DU_CODE.md.
+
+## Dashboard (dossier `dashboard/`)
+Tableau de bord web des tournées : moyenne au tronçon, hexagones, densité, conformité SDAL, lampadaires estimés et Street View intégré.
+
+    docker compose up --build -d        # puis http://localhost:8050
+
+Sans Docker :
+
+    python -m venv .venv && .venv/bin/pip install -r requirements.txt
+    .venv/bin/flask --app dashboard/serveur run --port 5001    # serveur d'analyse (bouton « Nouvelle tournée »)
+    .venv/bin/python dashboard/app.py                          # dashboard sur http://localhost:8050
+
+Le dashboard lit `rapports/` et calcule à partir de `mesures_pas2m.csv` :
+- **Moyenne au tronçon** (`dashboard/troncons.py`) : filaire de voirie OpenStreetMap (cache dans `dashboard/voirie/`), coupé à chaque carrefour (parts de ~150 m au-delà de 250 m). Chaque mesure est rattachée au tronçon le plus proche (< 15 m) d'orientation compatible avec le cap. Moyenne **par sens de passage** (chaque passage pèse autant), puis **moyenne des deux sens**. Un tronçon à double sens mesuré dans un seul sens est signalé « à repasser ».
+- **Hexagones de 10 m** (`dashboard/hexagones.py`) : même règle, une moyenne par sens puis moyenne des deux sens.
+- **Conformité SDAL** : un seuil d'éclairement moyen par type de voie (principale, distribution, résidentielle, desserte), modifiable dans l'interface. Valeurs par défaut = hypothèses en attendant le SDAL de la commune.
+- **Street View** : clic sur la carte, le classement ou le tableau ; la vue s'oriente dans le sens de la tournée.

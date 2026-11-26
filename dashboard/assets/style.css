@@ -1,0 +1,131 @@
+/* Thème du dashboard Clair-Obscur (chargé automatiquement par Dash depuis assets/) */
+:root {
+  --fond: #0d1117;
+  --surface: #161b22;
+  --surface-2: #1c222b;
+  --bord: #2a313c;
+  --texte: #e6edf3;
+  --texte-2: #8b949e;
+  --ambre: #f5b301;
+
+  /* composants Dash 4 (Dropdown, Slider, Input) en thème sombre */
+  --Dash-Fill-Interactive-Strong: #f5b301;
+  --Dash-Fill-Interactive-Weak: rgba(245, 179, 1, 0.10);
+  --Dash-Fill-Inverse-Strong: #161b22;
+  --Dash-Fill-Disabled: rgba(255, 255, 255, 0.06);
+  --Dash-Fill-Primary-Hover: rgba(255, 255, 255, 0.05);
+  --Dash-Fill-Primary-Active: rgba(255, 255, 255, 0.09);
+  --Dash-Text-Strong: #f0f6fc;
+  --Dash-Text-Primary: #e6edf3;
+  --Dash-Text-Weak: #8b949e;
+  --Dash-Text-Disabled: #6e7681;
+  --Dash-Stroke-Strong: #3d4654;
+  --Dash-Stroke-Weak: #2a313c;
+}
+
+body {
+  background: radial-gradient(1200px 500px at 10% -10%, rgba(245, 179, 1, 0.07), transparent 60%), var(--fond);
+  color: var(--texte);
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+}
+
+/* --- en-tête */
+.entete {
+  position: sticky; top: 0; z-index: 1030;
+  background: rgba(13, 17, 23, 0.85);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--bord);
+  padding: 10px 8px;
+}
+.logo {
+  width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; font-size: 22px;
+  background: linear-gradient(135deg, rgba(245, 179, 1, 0.25), rgba(245, 179, 1, 0.05));
+  border: 1px solid rgba(245, 179, 1, 0.35);
+}
+.titre { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em; color: var(--texte); }
+.sous-titre { font-size: 0.8rem; color: var(--texte-2); }
+
+.contenu { padding: 18px 24px 8px; }
+.contexte { color: var(--texte-2); font-size: 0.88rem; margin-bottom: 14px; }
+.contexte i { color: var(--ambre); }
+
+/* --- sélecteur de tournée */
+.choix-rapport.dash-dropdown { border-radius: 10px; }
+.dash-slider-container input { background: var(--fond); color: var(--texte); border-color: var(--bord); border-radius: 6px; }
+.dash-slider-mark { color: var(--texte-2); font-size: 0.75rem; }
+
+/* --- KPI */
+.kpi {
+  height: 100%; padding: 14px 16px; border-radius: 14px;
+  background: linear-gradient(180deg, var(--surface-2), var(--surface));
+  border: 1px solid var(--bord);
+  transition: border-color .15s, transform .15s;
+}
+.kpi:hover { border-color: #3d4654; transform: translateY(-1px); }
+.kpi-icone { font-size: 1.05rem; }
+.kpi-titre { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--texte-2); font-weight: 600; }
+.kpi-valeur { font-size: 1.65rem; font-weight: 700; margin-top: 6px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.kpi-detail { font-size: 0.76rem; color: var(--texte-2); margin-top: 4px; }
+.kpi-barre { height: 4px; margin-top: 8px; background: var(--bord); }
+
+/* --- cartes / blocs */
+.bloc { background: var(--surface); border: 1px solid var(--bord); border-radius: 14px; overflow: hidden; }
+.bloc > .card-header { background: transparent; border-bottom: 1px solid var(--bord); padding: 10px 14px; }
+.bloc > .card-footer { background: transparent; border-top: 1px solid var(--bord); }
+.bloc-titre { font-weight: 600; font-size: 0.92rem; }
+.bloc-titre i { color: var(--ambre); }
+
+/* boutons segmentés du mode de carte */
+#mode-carte .btn { border-color: var(--bord); color: var(--texte-2); font-size: 0.8rem; }
+#mode-carte .btn.active, #mode-carte .btn-check:checked + .btn {
+  background: var(--ambre); border-color: var(--ambre); color: #111; font-weight: 600;
+}
+#mode-carte .form-check { padding: 0; margin: 0; }
+.form-switch .form-check-input:checked { background-color: var(--ambre); border-color: var(--ambre); }
+
+/* onglets */
+.card-header-tabs .nav-link { color: var(--texte-2); border: none; font-size: 0.88rem; }
+.card-header-tabs .nav-link.active {
+  background: transparent; color: var(--texte); border-bottom: 2px solid var(--ambre); font-weight: 600;
+}
+
+/* curseur du seuil */
+.badge-seuil {
+  background: rgba(245, 179, 1, 0.15); color: var(--ambre); border: 1px solid rgba(245, 179, 1, 0.4);
+  border-radius: 999px; padding: 2px 10px; font-weight: 700; font-size: 0.9rem; font-variant-numeric: tabular-nums;
+}
+
+/* tableaux */
+.tableau-zones, .tableau-qualite { --bs-table-bg: transparent; }
+.tableau-zones td, .tableau-qualite td, .tableau-zones th { border-color: var(--bord); vertical-align: middle; }
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner input { color: var(--texte) !important; }
+
+/* fenêtre d'envoi */
+.modal-content { background: var(--surface); border: 1px solid var(--bord); }
+.modal-header, .modal-footer { border-color: var(--bord); }
+
+.pied { color: #5c6570; font-size: 0.75rem; text-align: center; padding: 22px 0 10px; }
+
+@media (max-width: 576px) {
+  .contenu { padding: 14px 16px 8px; }
+  .kpi-valeur { font-size: 1.3rem; }
+}
+
+/* --- Street View intégré */
+.sv-cadre { aspect-ratio: 16 / 10; background: #0b0e13; border-bottom: 1px solid var(--bord); }
+.sv-iframe { width: 100%; height: 100%; border: 0; display: block; }
+.sv-vide { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: var(--texte-2); font-size: 0.85rem; text-align: center; padding: 16px; }
+.sv-vide i { color: var(--ambre); }
+.sv-legende { padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; }
+.sv-legende:empty { display: none; }
+
+/* boutons segmentés (mode / couleur de la carte) */
+.segmente .btn { border-color: var(--bord); color: var(--texte-2); font-size: 0.8rem; }
+.segmente .btn.active, .segmente .btn-check:checked + .btn {
+  background: var(--ambre); border-color: var(--ambre); color: #111; font-weight: 600;
+}
+.segmente .form-check { padding: 0; margin: 0; }
+.input-group-text { background: var(--surface-2); border-color: var(--bord); color: var(--texte-2); }
+.form-control { background: var(--fond); border-color: var(--bord); color: var(--texte); }
+.form-control:focus { background: var(--fond); color: var(--texte); border-color: var(--ambre); box-shadow: none; }
