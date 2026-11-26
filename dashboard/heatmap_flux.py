@@ -19,7 +19,7 @@ Sorties, dans le dossier du rapport :
   heatmap_flux.geojson          isobandes : un MultiPolygon par classe (classe, E_min, E_max, couleur, surface_m2)
   heatmap_flux_points.geojson   centres des cellules de 2 m : E_moy, E_sens1, E_sens2, n_sens, n_passages
   heatmap_flux.png              image en dégradé (RGBA, Web Mercator ; coins dans la page HTML)
-  heatmap_flux.html             page autonome sur fond satellite (MapLibre), valeur en lux au survol, deux vues :
+  heatmap_flux.html             page autonome, fond satellite / sombre / clair (MapLibre), valeur en lux au survol, deux vues :
                                 dégradé lissé, ou un point par mesure et par luxmètre (L1, L2, L3, sans lissage) ;
                                 case « Lampadaires estimés » (lampadaires_estimes.geojson du rapport) ;
                                 image intégrée, connexion requise pour le fond de carte
@@ -88,7 +88,11 @@ def lire_mesures(dossier: Path, brut: bool = False) -> pd.DataFrame:
 
 def cellules(m: pd.DataFrame) -> pd.DataFrame:
     """Cellules de 2 m avec E_moy = moyenne des deux sens, et leur centre en Lambert 93."""
-    _, p = H.calculer(m)
+    return centres(H.calculer(m)[1])
+
+
+def centres(p: pd.DataFrame) -> pd.DataFrame:
+    """Ajoute le centre en Lambert 93 aux cellules de hexagones.calculer (déjà calculées par le dashboard)."""
     R = H.TAILLE_M / math.sqrt(3)
     p = p.assign(x=R * math.sqrt(3) * (p["q"] + p["r"] / 2), y=R * 1.5 * p["r"])
     return p.dropna(subset=["E_moy"])
@@ -357,8 +361,8 @@ PAGE = """<!doctype html>
  <label class="ligne" id="ligne-lampes">Lampadaires estimés <input type="checkbox" id="lampes"></label>
  <div id="legende-lampes" hidden></div>
  <div class="ligne">Opacité <input type="range" id="opacite" min="0" max="100" value="90"></div>
- <div class="ligne">Fond <div class="seg" id="fond"><button class="on" data-fond="satellite">Satellite</button>
-  <button data-fond="sombre">Sombre</button></div></div></div>
+ <div class="ligne" id="ligne-fond">Fond <div class="seg" id="fond"><button class="on" data-fond="satellite">Satellite</button>
+  <button data-fond="sombre">Sombre</button><button data-fond="clair">Clair</button></div></div></div>
 <div id="valeur"></div>
 <script>
 const CAPTEURS = __CAPTEURS__;
@@ -371,12 +375,15 @@ const carte = new maplibregl.Map({container: "carte", maxZoom: 21, attributionCo
       satellite: {type: "raster", tiles: [ESRI("World_Imagery")], tileSize: 256, maxzoom: 19,
                   attribution: "Imagerie © Esri, Maxar, Earthstar Geographics"},
       noms: {type: "raster", tiles: [ESRI("Reference/World_Boundaries_and_Places")], tileSize: 256, maxzoom: 19},
+      clair: {type: "raster", tiles: ["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png"], tileSize: 256,
+              attribution: "© OpenStreetMap © CARTO"},
       sombre: {type: "raster", tiles: ["https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"], tileSize: 256,
                attribution: "© OpenStreetMap © CARTO"},
       eclairement: {type: "image", url: IMG, coordinates: COINS}},
     layers: [
       {id: "satellite", type: "raster", source: "satellite", paint: {"raster-saturation": -0.35, "raster-brightness-max": 0.7}},
       {id: "sombre", type: "raster", source: "sombre", layout: {visibility: "none"}},
+      {id: "clair", type: "raster", source: "clair", layout: {visibility: "none"}},
       {id: "eclairement", type: "raster", source: "eclairement",
        paint: {"raster-resampling": "linear", "raster-opacity": 0.9, "raster-fade-duration": 0}},
       {id: "noms", type: "raster", source: "noms"}]}});
@@ -436,13 +443,24 @@ document.querySelectorAll("#vue button").forEach(b => b.onclick = () => {
   document.getElementById("note").textContent = NOTES[vue];
   bulle.style.display = "none";
 });
-document.querySelectorAll("#fond button").forEach(b => b.onclick = () => {
-  document.querySelectorAll("#fond button").forEach(x => x.classList.toggle("on", x === b));
-  const sat = b.dataset.fond === "satellite";
-  carte.setLayoutProperty("satellite", "visibility", sat ? "visible" : "none");
-  carte.setLayoutProperty("noms", "visibility", sat ? "visible" : "none");
-  carte.setLayoutProperty("sombre", "visibility", sat ? "none" : "visible");
-});
+function choisirFond(fond) {
+  if (!["satellite", "sombre", "clair"].includes(fond)) return;
+  document.querySelectorAll("#fond button").forEach(x => x.classList.toggle("on", x.dataset.fond === fond));
+  const appliquer = () => {
+    for (const c of ["satellite", "sombre", "clair"])
+      carte.setLayoutProperty(c, "visibility", c === fond ? "visible" : "none");
+    carte.setLayoutProperty("noms", "visibility", fond === "satellite" ? "visible" : "none");
+  };
+  carte.isStyleLoaded() ? appliquer() : carte.once("load", appliquer);
+}
+document.querySelectorAll("#fond button").forEach(b => b.onclick = () => choisirFond(b.dataset.fond));
+// intégrée au dashboard : le fond suit celui du dashboard (#fond=…, changé sans recharger la page)
+const fondAdresse = () => (location.hash.match(/fond=(\\w+)/) || [])[1];
+if (fondAdresse()) {
+  document.getElementById("ligne-fond").style.display = "none";
+  choisirFond(fondAdresse());
+}
+window.addEventListener("hashchange", () => choisirFond(fondAdresse()));
 
 // valeur au survol : grille d'octets (0,2 lx par pas) alignée sur les pixels de l'image, compressée (zlib)
 let codes = null;
@@ -501,14 +519,30 @@ def page(image_png: bytes, codes, cadre, capteurs, lampes, titre, params):
             .replace("__IMAGE__", base64.b64encode(image_png).decode()))
 
 
+RES_M, SIGMA_M, RAYON_M, IMAGE_M = 2.0, 4.0, 6.0, 1.0      # réglages par défaut (script et dashboard)
+
+
+def page_heatmap(p, m_capteurs, lampes, titre, brut=False, res=RES_M, sigma=SIGMA_M, rayon=RAYON_M, image_m=IMAGE_M):
+    """Page heatmap_flux.html : la même pour le script et pour l'onglet Heatmap du dashboard.
+    p : cellules avec centres (cellules / centres) ; m_capteurs : mesures pour la vue 3 capteurs.
+    Retourne (html, png, cadre, (E, x0, y0))."""
+    E, x0, y0 = surface(p, res, sigma, rayon)
+    rgba, codes, cadre = image_degrade(E, x0, y0, res, image_m)
+    image_png = png(rgba)
+    params = (f"Grille {res:g} m · lissage σ = {sigma:g} m · ≤ {rayon:g} m des mesures"
+              + (" · signal brut" if brut else ""))
+    return (page(image_png, codes, cadre, points_capteurs(m_capteurs), lampes, titre, params),
+            image_png, cadre, (E, x0, y0))
+
+
 # ------------------------------------------------------------------ MAIN
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("dossier", type=Path, help="dossier d'un rapport (contient mesures_pas2m.csv)")
-    ap.add_argument("--res-m", type=float, default=2.0, help="pas de la grille lissée (m)")
-    ap.add_argument("--sigma-m", type=float, default=4.0, help="écart-type du lissage gaussien (m)")
-    ap.add_argument("--rayon-m", type=float, default=6.0, help="distance max. à une cellule mesurée (m)")
-    ap.add_argument("--image-m", type=float, default=1.0, help="taille d'un pixel de l'image en dégradé (m au sol)")
+    ap.add_argument("--res-m", type=float, default=RES_M, help="pas de la grille lissée (m)")
+    ap.add_argument("--sigma-m", type=float, default=SIGMA_M, help="écart-type du lissage gaussien (m)")
+    ap.add_argument("--rayon-m", type=float, default=RAYON_M, help="distance max. à une cellule mesurée (m)")
+    ap.add_argument("--image-m", type=float, default=IMAGE_M, help="taille d'un pixel de l'image en dégradé (m au sol)")
     ap.add_argument("--brut", action="store_true", help="signal avant lissage du bruit (E_brut)")
     ap.add_argument("-o", "--sortie", type=Path, help="dossier de sortie (défaut : celui du rapport)")
     a = ap.parse_args()
@@ -518,21 +552,17 @@ def main():
     sortie.mkdir(parents=True, exist_ok=True)
     m = lire_mesures(a.dossier, a.brut)
     p = cellules(m)
-    E, x0, y0 = surface(p, a.res_m, a.sigma_m, a.rayon_m)
+    html, image_png, cadre, (E, x0, y0) = page_heatmap(
+        p, lire_mesures(a.dossier), lire_lampadaires(a.dossier), a.dossier.name, a.brut,
+        a.res_m, a.sigma_m, a.rayon_m, a.image_m)
     bandes = isobandes(E, x0, y0, a.res_m)
     pts = points(p)
     suffixe = "_brut" if a.brut else ""
     (sortie / f"heatmap_flux{suffixe}.geojson").write_text(json.dumps(bandes, separators=(",", ":")), encoding="utf-8")
     (sortie / f"heatmap_flux_points{suffixe}.geojson").write_text(json.dumps(pts, separators=(",", ":")),
                                                                  encoding="utf-8")
-    params = (f"Grille {a.res_m:g} m · lissage σ = {a.sigma_m:g} m · ≤ {a.rayon_m:g} m des mesures"
-              + (" · signal brut" if a.brut else ""))
-    rgba, codes, cadre = image_degrade(E, x0, y0, a.res_m, a.image_m)
-    image_png = png(rgba)
     (sortie / f"heatmap_flux{suffixe}.png").write_bytes(image_png)
-    (sortie / f"heatmap_flux{suffixe}.html").write_text(page(image_png, codes, cadre, points_capteurs(lire_mesures(a.dossier)),
-                                                             lire_lampadaires(a.dossier), a.dossier.name, params),
-                                                        encoding="utf-8")
+    (sortie / f"heatmap_flux{suffixe}.html").write_text(html, encoding="utf-8")
     print(f"{len(p)} cellules de 2 m, grille {E.shape[1]}×{E.shape[0]}, {len(bandes['features'])} classes, "
           f"{sum(f['properties']['n_zones'] for f in bandes['features'])} zones, image {cadre['w']}×{cadre['h']} px"
           f" ({len(image_png) / 1e6:.1f} Mo) — {time.time() - t0:.1f} s")

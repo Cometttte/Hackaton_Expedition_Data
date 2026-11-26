@@ -136,6 +136,7 @@ body {
 .outil-titre { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--texte-2); font-weight: 600; }
 .outil-couches { margin-left: auto; display: flex; flex-direction: column; gap: 2px; }
 .outil-couches .form-check { margin: 0; }
+.carte-heatmap { width: 100%; height: 640px; border: 0; background: #0b0f14; }
 .bandeau-lissage { background: rgba(245, 179, 1, 0.10); border-bottom: 1px solid rgba(245, 179, 1, 0.35);
   color: #f3d27a; font-size: 0.8rem; padding: 6px 14px; }
 

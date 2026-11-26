@@ -4,10 +4,11 @@ Trois lectures des mesures (cf. cahier des charges GETYS) :
   * Moyenne au tronçon : filaire OSM, une moyenne par sens de circulation puis moyenne des deux sens
   * Hexagones de 2 m   : bande continue le long du trajet (3 luxmètres décalés latéralement, comme
     getys_spatialisation.py), multi-passages, même règle par sens
-  * Points chauds / froids : valeur moyenne autour de chaque point (méthode de carte.html, getys_rapport.py),
-    rayon fixe en mètres quel que soit le zoom
+  * Heatmap : la page de heatmap_flux.py (dégradé lissé ou 3 capteurs, lampadaires estimés), intégrée telle quelle
 La conformité (SDAL : un seuil d'éclairement moyen par type de voie) ne s'applique qu'aux tronçons.
-Chaque vue peut être affichée avant ou après le lissage du bruit (colonne E_brut de mesures_pas2m.csv).
+Chaque vue apporte une lecture différente : les tronçons servent à la conformité SDAL et à la comparaison
+avant / après lissage du bruit (colonne E_brut de mesures_pas2m.csv), avec les valeurs aberrantes retirées ;
+les hexagones au détail fin ; la heatmap au dégradé et aux lampadaires estimés. Le fond vaut pour toutes les vues.
 """
 import base64
 import gzip
@@ -30,6 +31,7 @@ from flask import Response, abort, request, send_from_directory
 from pyproj import Transformer
 from scipy.spatial import cKDTree
 
+import heatmap_flux as HF
 import hexagones as H
 import troncons as T
 
@@ -134,6 +136,35 @@ def _hexagones_gz(dossier, mtime, brut):
     data = charger(dossier, brut=brut)
     brut_json = json.dumps(data["hex"][0], separators=(",", ":")).encode()
     return gzip.compress(brut_json, 6), f'"hex-{int(mtime)}-{int(brut)}"'
+
+
+@app.server.route("/heatmap/<nom>/<variante>.html")
+def servir_heatmap(nom, variante):
+    """Page de heatmap_flux.py pour une tournée, générée au premier appel (quelques secondes) puis en cache."""
+    dossiers = {d.name: d for d in lister_rapports()}
+    if nom not in dossiers or variante not in ("lisse", "brut"):
+        abort(404)
+    d = dossiers[nom]
+    etag = f'"heatmap-{int(d.stat().st_mtime)}-{variante}"'
+    if request.headers.get("If-None-Match") == etag:
+        return Response(status=304)
+    rep = Response(_page_heatmap(str(d), d.stat().st_mtime, variante == "brut"), mimetype="text/html")
+    rep.headers.update({"ETag": etag, "Cache-Control": "public, max-age=86400, immutable"})
+    return rep
+
+
+@lru_cache(maxsize=2)
+def _page_heatmap(dossier, _mtime, brut):
+    """Mêmes entrées que le script : cellules de 2 m (moyenne des deux sens), mesures filtrées pour les
+    3 capteurs, lampadaires_estimes.geojson ; brut : surface recalculée sur E_brut (comme --brut)."""
+    data = charger(dossier, brut=brut)
+    html_page, *_ = HF.page_heatmap(HF.centres(data["hex"][1]), charger(dossier)["mesures"],
+                                     HF.lire_lampadaires(Path(dossier)), Path(dossier).name, brut=data["brut"])
+    return html_page.encode("utf-8")
+
+
+def url_heatmap(data):
+    return f"/heatmap/{quote(data['nom'])}/{'brut' if data['brut'] else 'lisse'}.html?v={data['version']}"
 
 
 def url_hexagones(data):
@@ -350,13 +381,6 @@ def cap_proche(data, lat, lon):
     return float(data["mesures"].iloc[i].get("cap", 0) or 0)
 
 
-def taille_points(zoom, lat=48.8):
-    """Diamètre (px) d'un point chaud/froid : rayon de 9 m à l'écran, borné à 3-40 px (comme carte.html).
-    MapLibre : tuiles de 512 px -> mètres par pixel = 40 075 017 · cos(lat) / 2^(zoom + 9)."""
-    mpp = 40075016.686 * math.cos(math.radians(lat)) / 2 ** ((zoom or ZOOM0) + 9)
-    return 2 * max(3.0, min(40.0, 9.0 / mpp))
-
-
 # ------------------------------------------------------------------ COMPOSANTS
 def kpi(icone, titre, valeur, detail=None, couleur="light", barre=None):
     corps = [
@@ -417,27 +441,12 @@ def _traces_troncons(data, tr, couleur):
     return traces
 
 
-def _trace_points(m, zoom):
-    """Points chauds / froids (carte.html) : couleur = valeur, rayon fixe en mètres, les plus chauds dessus."""
-    m = m.sort_values("lux")
-    h = m["heure_locale"] if "heure_locale" in m else pd.Series(np.nan, index=m.index)
-    cd = np.c_[m["lux"], m["sens"] if "sens" in m else np.ones(len(m)),
-               [f"{int(x)}h{int((x % 1) * 60):02d}" if pd.notna(x) else "" for x in h]]
-    return go.Scattermap(
-        lat=m["lat"], lon=m["lon"], mode="markers", name="Points chauds / froids",
-        marker=dict(size=taille_points(zoom, float(m["lat"].mean()) if len(m) else 48.8), color=m["lux"].clip(0, LUX_MAX),
-                    colorscale=ECHELLE, cmin=0, cmax=LUX_MAX, opacity=0.55,
-                    colorbar=dict(title="lux", **BARRE_COULEUR)),
-        customdata=cd, hovertemplate="<b>%{customdata[0]:.1f} lx</b><br>sens %{customdata[1]} · %{customdata[2]}"
-                                     "<extra></extra>")
-
-
 def carte(data, mode, couleur, couches, sdal, selection, fond, vue, uirev):
     """Figure complète + index des traces (pour les mises à jour partielles par Patch)."""
     m = data["mesures"]
     vue = vue or {}
     zoom = vue.get("zoom") or ZOOM0
-    meta = {"lum": [], "sus": [], "ab": [], "points": [], "i_tr": None, "i_pt": None}
+    meta = {"sus": [], "ab": [], "i_tr": None, "i_pt": None}
     if m is None:
         return carte_vide("Aucune mesure dans ce rapport"), meta
     fig = go.Figure()
@@ -460,35 +469,7 @@ def carte(data, mode, couleur, couches, sdal, selection, fond, vue, uirev):
             hovertemplate="<b>%{z:.1f} lx</b> (moyenne des deux sens)<br>%{customdata} passage(s)"
                           "<br><i>clic : détail par sens</i><extra></extra>"))
 
-    elif mode == "points":
-        meta["points"] = [len(fig.data)]
-        fig.add_trace(_trace_points(m, zoom))
-
     # couches toujours présentes : les interrupteurs ne changent que leur visibilité (Patch)
-    lum = data["luminaires"]
-    if lum is not None:
-        if "type" in lum:                                     # lampadaires estimés, par type de lampe
-            for typ, g in lum.groupby("type"):
-                meta["lum"].append(len(fig.data))
-                fig.add_trace(go.Scattermap(
-                    lat=g["lat"], lon=g["lon"], mode="markers", name=f"💡 {typ.replace('_', ' ')} ({len(g)})",
-                    visible="lum" in couches,
-                    marker=dict(size=8, color=COUL_TYPES.get(typ, "#ffffff"), opacity=1),
-                    customdata=g.reindex(columns=["type_libelle", "puissance_w", "puissance_min_w",
-                                                  "puissance_max_w", "cote", "E_pic", "n_passages"])
-                    .assign(_marque="lampe").values,                 # 8 champs : distinct des tronçons (7)
-                    hovertemplate="💡 <b>%{customdata[0]}</b><br>Puissance estimée : %{customdata[1]:.0f} W "
-                                  "(%{customdata[2]:.0f}–%{customdata[3]:.0f})<br>Côté : %{customdata[4]}"
-                                  " · pic %{customdata[5]:.0f} lx · %{customdata[6]} passage(s)<extra></extra>"))
-        else:
-            meta["lum"].append(len(fig.data))
-            fig.add_trace(go.Scattermap(
-                lat=lum["lat"], lon=lum["lon"], mode="markers", name="Luminaires détectés",
-                visible="lum" in couches, marker=dict(size=5, color="#ffffff", opacity=0.75),
-                customdata=lum.reindex(columns=["E_pic", "n_detections"]).values,
-                hovertemplate="💡 Luminaire détecté<br>Pic : %{customdata[0]:.0f} lx"
-                              "<br>Détections : %{customdata[1]}<extra></extra>"))
-
     ab = data["aberrants"]                                    # valeurs aberrantes retirées, par motif
     if ab is not None:
         for motif, g in ab.dropna(subset=["lat"]).groupby("motif"):
@@ -794,7 +775,7 @@ def segmente(id_, valeur, options, titre=None):
                            labelCheckedClassName="active", options=options)
     if not titre:
         return radio
-    return html.Div([html.Span(titre, className="outil-titre"), radio], className="outil")
+    return html.Div([html.Span(titre, className="outil-titre"), radio], className="outil", id=f"outil-{id_}")
 
 
 upload_style = {"border": "1.5px dashed #3d444d", "borderRadius": "10px", "padding": "22px",
@@ -846,8 +827,8 @@ app.layout = html.Div(className="page", children=[
                     segmente("mode-carte", "troncons", [
                         {"label": [html.I(className="bi bi-bezier2 me-1"), "Tronçons"], "value": "troncons"},
                         {"label": [html.I(className="bi bi-hexagon me-1"), "Hexagones"], "value": "hex"},
-                        {"label": [html.I(className="bi bi-thermometer-half me-1"), "Points chauds / froids"],
-                         "value": "points"}], "Vue"),
+                        {"label": [html.I(className="bi bi-thermometer-half me-1"), "Heatmap"],
+                         "value": "heatmap"}], "Vue"),
                     segmente("couleur-carte", "eclairement", [
                         {"label": "Éclairement", "value": "eclairement"},
                         {"label": "Conformité SDAL", "value": "conformite"}], "Couleur (tronçons)"),
@@ -861,12 +842,14 @@ app.layout = html.Div(className="page", children=[
                         {"label": [html.I(className="bi bi-globe-europe-africa me-1"), "Satellite"],
                          "value": "satellite"}], "Fond"),
                     dbc.Checklist(id="couches", value=[], switch=True, className="small outil-couches",
-                                  options=[{"label": "Lampadaires estimés", "value": "lum"},
-                                           {"label": "Supports suspects", "value": "sus"},
+                                  options=[{"label": "Supports suspects", "value": "sus"},
                                            {"label": "Valeurs aberrantes", "value": "ab"}]),
                 ])),
                 html.Div(id="bandeau-lissage"),
-                dbc.CardBody(dcc.Graph(id="carte", config={"scrollZoom": True, "displaylogo": False}),
+                dbc.CardBody([dcc.Graph(id="carte", config={"scrollZoom": True, "displaylogo": False}),
+                              # vue Heatmap : page de heatmap_flux.py (fond, vue, lampadaires et opacité intégrés)
+                              html.Iframe(id="carte-heatmap", className="carte-heatmap", style={"display": "none"},
+                                          title="Heatmap de l'éclairement")],
                              className="p-0"),
                 dbc.CardFooter([html.I(className="bi bi-cursor me-2"),
                                 "Cliquez sur la carte, une rue du classement ou une ligne d'un tableau : "
@@ -1107,23 +1090,33 @@ def afficher(dossier, *valeurs):
 # seuils en mode conformité). Le fond, les couches, la taille des points et la sélection passent par Patch :
 # la carte garde son zoom et ne clignote pas.
 @app.callback(Output("carte", "figure"), Output("carte-meta", "data"), Output("bandeau-lissage", "children"),
+              Output("carte", "style"), Output("carte-heatmap", "src"), Output("carte-heatmap", "style"),
               Input("choix-rapport", "value"), Input("mode-carte", "value"), Input("couleur-carte", "value"),
               Input("lissage", "value"), *SDAL_INPUTS,
               State("couches", "value"), State("selection", "data"), State("fond", "value"),
               State("vue", "data"), State("uirev", "data"))
 def afficher_carte(dossier, mode, couleur, lissage, *reste):
     *valeurs, couches, selection, fond, vue, uirev = reste
+    cache, montre = {"display": "none"}, {"display": "block"}
     if not dossier:
-        return carte_vide("Aucune tournée analysée"), {}, None
+        return carte_vide("Aucune tournée analysée"), {}, None, montre, dash.no_update, cache
     declencheur = str(ctx.triggered_id or "")
-    if mode != "troncons":
-        couleur = "eclairement"                                     # conformité : tronçons seulement
+    if mode != "troncons":                       # conformité, avant / après et couches : tronçons seulement
+        couleur, lissage, couches = "eclairement", "apres", []
+        if declencheur in ("lissage", "couleur-carte"):
+            return (dash.no_update,) * 6
     if declencheur.startswith("sdal-") and couleur != "conformite":
-        return dash.no_update, dash.no_update, dash.no_update       # les seuils ne changent que la conformité
+        return (dash.no_update,) * 6                                  # les seuils ne changent que la conformité
     if declencheur == "choix-rapport":
         vue, selection = {}, None                                    # nouvelle tournée : vue d'ensemble
     brut = lissage == "avant"
     data = charger(dossier, brut=brut)
+    if mode == "heatmap":
+        bandeau = [html.Div([html.I(className="bi bi-thermometer-half me-2"),
+                             "Heatmap : moyenne des deux sens, lissée (σ = 4 m), et lampadaires estimés. Vue lissée / "
+                             "3 capteurs, lampadaires et opacité se règlent dans le panneau de la carte. Premier "
+                             "affichage d'une tournée : quelques secondes."], className="bandeau-lissage")]
+        return carte_vide(""), {}, bandeau, cache, f"{url_heatmap(data)}#fond={fond}", montre
     fig, meta = carte(data, mode, couleur, couches or [], sdal_de(valeurs), selection, fond, vue, uirev)
     bandeau = []
     if mode == "hex":
@@ -1136,7 +1129,15 @@ def afficher_carte(dossier, mode, couleur, lissage, *reste):
         if not data["brut"]:
             texte = "Ce rapport ne contient pas le signal brut (colonne E_brut) : relancez l'analyse pour l'obtenir."
         bandeau.append(html.Div([html.I(className="bi bi-soundwave me-2"), texte], className="bandeau-lissage"))
-    return fig, meta, bandeau or None
+    return fig, meta, bandeau or None, montre, dash.no_update, cache
+
+
+@app.callback(Output("outil-couleur-carte", "style"), Output("outil-lissage", "style"), Output("couches", "style"),
+              Input("mode-carte", "value"))
+def montrer_outils(mode):
+    """Couleur (conformité SDAL), avant / après lissage et couches : vue Tronçons seulement."""
+    s = {} if mode == "troncons" else {"display": "none"}
+    return s, s, s
 
 
 @app.callback(Output("couleur-carte", "options"), Output("couleur-carte", "value"),
@@ -1147,6 +1148,14 @@ def options_couleur(mode, valeur):
     options = [{"label": "Éclairement", "value": "eclairement"},
                {"label": "Conformité SDAL", "value": "conformite", "disabled": not tr}]
     return options, valeur if tr else "eclairement"
+
+
+@app.callback(Output("carte-heatmap", "src", allow_duplicate=True), Input("fond", "value"),
+              State("carte-heatmap", "src"), prevent_initial_call=True)
+def changer_fond_heatmap(fond, src):
+    if not src:
+        return dash.no_update
+    return f"{src.split('#')[0]}#fond={fond}"
 
 
 @app.callback(Output("carte", "figure", allow_duplicate=True), Input("fond", "value"), prevent_initial_call=True)
@@ -1167,7 +1176,7 @@ def changer_couches(couches, meta):
     if not meta:
         return dash.no_update
     p = Patch()
-    for cle in ("lum", "sus", "ab"):
+    for cle in ("sus", "ab"):
         for i in meta.get(cle, []):
             p["data"][i]["visible"] = cle in (couches or [])
     return p
@@ -1177,18 +1186,11 @@ def changer_couches(couches, meta):
               Input("carte", "relayoutData"), State("carte-meta", "data"), State("vue", "data"),
               prevent_initial_call=True)
 def suivre_vue(relayout, meta, vue):
-    """Mémorise la vue (centre, zoom) pour les reconstructions ; points chauds/froids : rayon constant en
-    mètres -> taille en pixels recalculée à chaque zoom."""
+    """Mémorise la vue (centre, zoom) pour les reconstructions."""
     if not relayout or not any(k in relayout for k in ("map.zoom", "map.center")):
         return dash.no_update, dash.no_update
     vue = {**(vue or {}), **{k.split(".")[1]: v for k, v in relayout.items() if k in ("map.zoom", "map.center")}}
-    if not meta or not meta.get("points") or "map.zoom" not in relayout:
-        return dash.no_update, vue
-    lat = (vue.get("center") or {}).get("lat", 48.8)
-    p = Patch()
-    for i in meta["points"]:
-        p["data"][i]["marker"]["size"] = taille_points(vue["zoom"], lat)
-    return p, vue
+    return dash.no_update, vue
 
 
 # ------------------------------------------------------------------ CALLBACKS : SÉLECTION -> CARTE + STREET VIEW
@@ -1256,14 +1258,9 @@ def choisir_point(clic_carte, clics_deficit, cellule, cellule_q, cellule_ab, dos
         if isinstance(cd, list) and len(cd) == 7 and cd[1] and data["geoms"] and cd[0] in data["geoms"]:  # tronçon
             glon, glat = data["geoms"][cd[0]]
             sel.update(titre=cd[1], detail=f"{cd[2]} · {cd[3]}", tid=cd[0], tr_lat=list(glat), tr_lon=list(glon))
-        elif isinstance(cd, list) and len(cd) == 8 and cd[7] == "lampe":          # lampadaire estimé
-            sel.update(titre=f"💡 Lampadaire estimé — {cd[0]}",
-                       detail=f"{cd[1]:.0f} W estimés · côté {cd[4]} · pic {cd[5]:.0f} lx")
         elif isinstance(cd, list) and len(cd) == 9 and cd[8] == "aberrant":       # valeur aberrante retirée
             sel.update(titre=f"⚠ Valeur aberrante retirée — {cd[0]}",
                        detail=f"pic {cd[1]:.0f} lx (fond {cd[2]:.0f} lx) · largeur {cd[3]:.1f} m · {cd[5]}")
-        elif isinstance(cd, list) and len(cd) == 3:                                # point chaud / froid
-            sel.update(titre="Point de mesure", detail=f"{float(cd[0]):.1f} lx · sens {cd[1]} · {cd[2]}")
         elif hexa is not None:                                                     # hexagone
             sel.update(titre="Hexagone de 2 m", detail=f"{fmt(hexa['E_moy'], ' lx')} (sens 1 : "
                        f"{fmt(hexa['E_sens1'], ' lx')}, sens 2 : {fmt(hexa['E_sens2'], ' lx')}) · "
@@ -1333,8 +1330,6 @@ def marquer_selection(sel, meta):
     p["layout"]["map"]["center"] = {"lat": sel.get("c_lat", sel["lat"]), "lon": sel.get("c_lon", sel["lon"])}
     p["layout"]["map"]["zoom"] = zoom
     p["layout"]["uirevision"] = rev               # gardé pour les reconstructions suivantes : pas de saut de vue
-    for i in meta.get("points", []):
-        p["data"][i]["marker"]["size"] = taille_points(zoom, sel["lat"])
     return p, rev, {"zoom": zoom, "center": {"lat": sel.get("c_lat", sel["lat"]), "lon": sel.get("c_lon", sel["lon"])}}
 
 
