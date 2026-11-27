@@ -1,39 +1,40 @@
 /* Thème du dashboard Clair-Obscur (chargé automatiquement par Dash depuis assets/)
-   Charte Bouygues Energies & Services (palette relevée sur bouygues-es.fr) :
-   bleu marine #1C2959 · marine foncé #00121D · bleu #005B90 · bleu canard #0093BB · bleu clair #63BEDD
-   orange #E75113 · vert #00B894 · jaune-orangé #F7A600 · texte #333333 · gris #F2F2F2 / #BFBFBF
-   Police : Roboto (Roboto Black pour les grands titres). */
+   Charte GETYS (« Relevé & visualisé ! », couleurs relevées sur le logo de Getys_Hackathon.pdf) :
+   vert #3E9C61 · vert clair #5BB26A · vert anis #8DBF2E · vert foncé (titres) #1F6E43 · fond blanc.
+   États de conformité : conforme #2E9E5B · non conforme #E75113 · un seul sens #F2A900.
+   Police : Roboto. */
 :root {
-  --bes-marine: #1C2959;
-  --bes-marine-fonce: #00121D;
-  --bes-bleu: #005B90;
-  --bes-canard: #0093BB;
-  --bes-bleu-clair: #63BEDD;
-  --bes-orange: #E75113;
-  --bes-vert: #00B894;
-  --bes-jaune: #F7A600;
+  --vert-fonce: #1F6E43;
+  --vert-nuit: #10301E;
+  --vert-texte: #2A8350;
+  --vert: #3E9C61;
+  --vert-clair: #5BB26A;
+  --lime: #8DBF2E;
+  --orange: #E75113;
+  --etat-ok: #2E9E5B;
+  --jaune: #F2A900;
 
-  --fond: #F2F2F2;
+  --fond: #F4F8F5;
   --surface: #FFFFFF;
-  --surface-2: #F7F8FA;
-  --bord: #DDE1E8;
-  --texte: #333333;
-  --texte-2: #6B7280;
-  --accent: var(--bes-canard);
+  --surface-2: #F6FAF7;
+  --bord: #DCE7DF;
+  --texte: #26332B;
+  --texte-2: #66756B;
+  --accent: var(--vert);
 
   /* composants Dash 4 (Dropdown, Slider, Input) */
-  --Dash-Fill-Interactive-Strong: var(--bes-canard);
-  --Dash-Fill-Interactive-Weak: rgba(0, 147, 187, 0.08);
+  --Dash-Fill-Interactive-Strong: var(--vert);
+  --Dash-Fill-Interactive-Weak: rgba(62, 156, 97, 0.08);
   --Dash-Fill-Inverse-Strong: #FFFFFF;
   --Dash-Fill-Disabled: rgba(0, 0, 0, 0.05);
-  --Dash-Fill-Primary-Hover: rgba(28, 41, 89, 0.05);
-  --Dash-Fill-Primary-Active: rgba(28, 41, 89, 0.09);
-  --Dash-Text-Strong: var(--bes-marine);
-  --Dash-Text-Primary: #333333;
-  --Dash-Text-Weak: #6B7280;
+  --Dash-Fill-Primary-Hover: rgba(31, 110, 67, 0.05);
+  --Dash-Fill-Primary-Active: rgba(31, 110, 67, 0.09);
+  --Dash-Text-Strong: var(--vert-fonce);
+  --Dash-Text-Primary: #26332B;
+  --Dash-Text-Weak: #66756B;
   --Dash-Text-Disabled: #9CA3AF;
-  --Dash-Stroke-Strong: #BFBFBF;
-  --Dash-Stroke-Weak: #DDE1E8;
+  --Dash-Stroke-Strong: #BFCBC2;
+  --Dash-Stroke-Weak: #DCE7DF;
 }
 
 body {
@@ -41,85 +42,85 @@ body {
   color: var(--texte);
   font-family: Roboto, Arial, "Helvetica Neue", Helvetica, sans-serif;
 }
-h1, h2, h3, h4, h5, h6, .h6 { color: var(--bes-marine); }
+h1, h2, h3, h4, h5, h6, .h6 { color: var(--vert-fonce); }
 
-/* --- en-tête : bandeau marine, comme le site Bouygues E&S */
+/* --- en-tête : blanc, logo GETYS à gauche (comme la page de garde du dossier GETYS) */
 .entete {
   position: sticky; top: 0; z-index: 1030;
-  background: var(--bes-marine);
-  border-bottom: 3px solid var(--bes-orange);
-  padding: 10px 8px;
-  box-shadow: 0 2px 10px rgba(0, 18, 29, 0.25);
+  background: #FFFFFF;
+  border-bottom: 1px solid var(--bord);
+  padding: 8px 8px;
+  box-shadow: 0 2px 10px rgba(16, 48, 30, 0.08);
 }
 .logo {
   width: 42px; height: 42px; border-radius: 10px; display: grid; place-items: center; font-size: 22px;
-  background: #FFFFFF; color: var(--bes-marine);
+  background: var(--vert); color: #FFFFFF;
 }
-.titre { font-size: 1.3rem; font-weight: 900; letter-spacing: 0.02em; text-transform: uppercase; color: #FFFFFF; }
-.sous-titre { font-size: 0.8rem; color: var(--bes-bleu-clair); }
-.entete .btn-outline-light { border-color: rgba(255, 255, 255, 0.55); color: #FFFFFF; }
-.entete .btn-outline-light:hover { background: #FFFFFF; color: var(--bes-marine); }
-.entete .btn-warning { background: var(--bes-orange); border-color: var(--bes-orange); color: #FFFFFF; }
-.entete .btn-warning:hover { background: #c94410; border-color: #c94410; color: #FFFFFF; }
+.titre { font-size: 1.3rem; font-weight: 900; letter-spacing: 0.02em; text-transform: uppercase; color: var(--vert-fonce); }
+.sous-titre { font-size: 0.8rem; color: var(--vert); font-weight: 500; }
+.entete .btn-outline-light { border-color: var(--vert); color: var(--vert-fonce); background: #FFFFFF; }
+.entete .btn-outline-light:hover { background: var(--vert); border-color: var(--vert); color: #FFFFFF; }
+.entete .btn-warning { background: var(--vert); border-color: var(--vert); color: #FFFFFF; font-weight: 600; }
+.entete .btn-warning:hover { background: var(--vert-fonce); border-color: var(--vert-fonce); color: #FFFFFF; }
 .choix-rapport.dash-dropdown { border-radius: 6px; background: #FFFFFF; }
 
 .contenu { padding: 18px 24px 8px; }
 .contexte { color: var(--texte-2); font-size: 0.88rem; margin-bottom: 14px; }
-.contexte i { color: var(--bes-canard); }
+.contexte i { color: var(--vert); }
 
 /* couleurs d'état Bootstrap remappées sur la palette (lisibles sur fond clair) */
 .text-warning { color: #C77F00 !important; }
-.text-success { color: #00916F !important; }
-.text-danger { color: var(--bes-orange) !important; }
-.text-info { color: var(--bes-bleu) !important; }
-.progress-bar.bg-warning { background-color: var(--bes-jaune) !important; }
-.progress-bar.bg-success { background-color: var(--bes-vert) !important; }
-.progress-bar.bg-danger { background-color: var(--bes-orange) !important; }
-.progress-bar.bg-info { background-color: var(--bes-canard) !important; }
-.btn-outline-info { color: var(--bes-bleu); border-color: var(--bes-bleu); }
-a { color: var(--bes-bleu); }
+.text-success { color: #2A8350 !important; }
+.text-danger { color: var(--orange) !important; }
+.text-info { color: var(--vert-texte) !important; }
+.progress-bar.bg-warning { background-color: var(--jaune) !important; }
+.progress-bar.bg-success { background-color: var(--etat-ok) !important; }
+.progress-bar.bg-danger { background-color: var(--orange) !important; }
+.progress-bar.bg-info { background-color: var(--vert) !important; }
+.btn-outline-info { color: var(--vert-texte); border-color: var(--vert-texte); }
+a { color: var(--vert-texte); }
 
 /* --- KPI */
 .kpi {
   height: 100%; padding: 14px 16px; border-radius: 6px;
   background: var(--surface);
-  border: 1px solid var(--bord); border-top: 3px solid var(--bes-canard);
-  box-shadow: 0 1px 3px rgba(0, 18, 29, 0.06);
+  border: 1px solid var(--bord); border-top: 3px solid var(--vert);
+  box-shadow: 0 1px 3px rgba(16, 48, 30, 0.06);
   transition: box-shadow .15s, transform .15s;
 }
-.kpi:hover { box-shadow: 0 4px 14px rgba(0, 18, 29, 0.10); transform: translateY(-1px); }
+.kpi:hover { box-shadow: 0 4px 14px rgba(16, 48, 30, 0.10); transform: translateY(-1px); }
 .kpi-icone { font-size: 1.05rem; }
 .kpi-titre { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--texte-2); font-weight: 700; }
 .kpi-valeur { font-size: 1.65rem; font-weight: 700; margin-top: 6px; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .kpi-detail { font-size: 0.76rem; color: var(--texte-2); margin-top: 4px; }
-.kpi-barre { height: 4px; margin-top: 8px; background: #E8EBF0; }
+.kpi-barre { height: 4px; margin-top: 8px; background: #E8F0EA; }
 
 /* --- cartes / blocs */
 .bloc { background: var(--surface); border: 1px solid var(--bord); border-radius: 6px; overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 18, 29, 0.06); }
+  box-shadow: 0 1px 3px rgba(16, 48, 30, 0.06); }
 .bloc > .card-header { background: var(--surface); border-bottom: 1px solid var(--bord); padding: 10px 14px; }
 .bloc > .card-footer { background: var(--surface-2); border-top: 1px solid var(--bord); }
-.bloc-titre { font-weight: 700; font-size: 0.95rem; color: var(--bes-marine); }
-.bloc-titre i { color: var(--bes-orange); }
+.bloc-titre { font-weight: 700; font-size: 0.95rem; color: var(--vert-fonce); }
+.bloc-titre i { color: var(--vert); }
 
 /* boutons segmentés (vue, couleur, bruit, fond) */
 .segmente .btn { border-color: var(--bord); color: var(--texte-2); font-size: 0.8rem; background: #FFFFFF; }
-.segmente .btn:hover { color: var(--bes-marine); background: var(--surface-2); }
+.segmente .btn:hover { color: var(--vert-fonce); background: var(--surface-2); }
 .segmente .btn.active, .segmente .btn-check:checked + .btn {
-  background: var(--bes-marine); border-color: var(--bes-marine); color: #FFFFFF; font-weight: 600;
+  background: var(--vert-fonce); border-color: var(--vert-fonce); color: #FFFFFF; font-weight: 600;
 }
 .segmente .btn-check:disabled + .btn { opacity: 0.45; }
 .segmente .form-check { padding: 0; margin: 0; }
-.form-switch .form-check-input:checked { background-color: var(--bes-canard); border-color: var(--bes-canard); }
+.form-switch .form-check-input:checked { background-color: var(--vert); border-color: var(--vert); }
 .input-group-text { background: var(--surface-2); border-color: var(--bord); color: var(--texte-2); }
 .form-control { background: #FFFFFF; border-color: var(--bord); color: var(--texte); }
-.form-control:focus { border-color: var(--bes-canard); box-shadow: 0 0 0 3px rgba(0, 147, 187, 0.15); }
+.form-control:focus { border-color: var(--vert); box-shadow: 0 0 0 3px rgba(62, 156, 97, 0.15); }
 
 /* onglets */
 .card-header-tabs .nav-link { color: var(--texte-2); border: none; font-size: 0.88rem; }
-.card-header-tabs .nav-link:hover { color: var(--bes-marine); }
+.card-header-tabs .nav-link:hover { color: var(--vert-fonce); }
 .card-header-tabs .nav-link.active {
-  background: transparent; color: var(--bes-marine); border-bottom: 3px solid var(--bes-orange); font-weight: 700;
+  background: transparent; color: var(--vert-fonce); border-bottom: 3px solid var(--lime); font-weight: 700;
 }
 
 /* tableaux */
@@ -129,11 +130,12 @@ a { color: var(--bes-bleu); }
 
 /* fenêtre d'envoi */
 .modal-content { background: var(--surface); border: 1px solid var(--bord); }
-.modal-header { background: var(--bes-marine); color: #FFFFFF; }
+.modal-header { background: var(--vert-fonce); color: #FFFFFF; }
 .modal-header .modal-title { color: #FFFFFF; }
 .modal-header .btn-close { filter: invert(1); }
 .modal-footer { border-color: var(--bord); }
-.modal-footer .btn-warning { background: var(--bes-orange); border-color: var(--bes-orange); color: #FFFFFF; }
+.modal-footer .btn-warning { background: var(--vert); border-color: var(--vert); color: #FFFFFF; }
+.modal-footer .btn-warning:hover { background: var(--vert-fonce); border-color: var(--vert-fonce); }
 
 .pied { color: var(--texte-2); font-size: 0.75rem; text-align: center; padding: 22px 0 10px; }
 
@@ -143,14 +145,14 @@ a { color: var(--bes-bleu); }
 }
 
 /* --- Street View intégré */
-.sv-cadre { aspect-ratio: 16 / 10; background: #E8EBF0; border-bottom: 1px solid var(--bord); }
+.sv-cadre { aspect-ratio: 16 / 10; background: #E8F0EA; border-bottom: 1px solid var(--bord); }
 .sv-iframe { width: 100%; height: 100%; border: 0; display: block; }
 .sv-vide { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;
   color: var(--texte-2); font-size: 0.85rem; text-align: center; padding: 16px; }
-.sv-vide i { color: var(--bes-canard); }
+.sv-vide i { color: var(--vert); }
 .sv-legende { padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; }
 .sv-legende:empty { display: none; }
-.sv-legende .fw-semibold { color: var(--bes-marine); }
+.sv-legende .fw-semibold { color: var(--vert-fonce); }
 
 /* --- barre d'outils de la carte */
 .barre-outils { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 16px; }
@@ -158,59 +160,56 @@ a { color: var(--bes-bleu); }
 .outil-titre { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--texte-2); font-weight: 700; }
 .outil-couches { margin-left: auto; display: flex; flex-direction: column; gap: 2px; }
 .outil-couches .form-check { margin: 0; }
-.bandeau-lissage { background: rgba(0, 147, 187, 0.08); border-bottom: 1px solid rgba(0, 147, 187, 0.3);
-  color: var(--bes-bleu); font-size: 0.8rem; padding: 6px 14px; }
+.bandeau-lissage { background: rgba(62, 156, 97, 0.08); border-bottom: 1px solid rgba(62, 156, 97, 0.3);
+  color: var(--vert-texte); font-size: 0.8rem; padding: 6px 14px; }
 
 /* --- rues les plus en déficit */
 .liste-deficits { display: flex; flex-direction: column; gap: 6px; max-height: 470px; overflow-y: auto; padding-right: 4px; }
 .ligne-deficit { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: 28px 1fr auto;
   gap: 10px; align-items: center; padding: 9px 12px; border-radius: 6px; border: 1px solid var(--bord);
   background: var(--surface); transition: border-color .15s, background .15s; width: 100%; }
-.ligne-deficit:hover, .ligne-deficit:focus-visible { border-color: var(--bes-canard); background: rgba(0, 147, 187, 0.05); }
+.ligne-deficit:hover, .ligne-deficit:focus-visible { border-color: var(--vert); background: rgba(62, 156, 97, 0.05); }
 .deficit-rang { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
-  font-size: 0.8rem; background: var(--bes-marine); color: #FFFFFF; }
-.deficit-nom { font-weight: 700; font-size: 0.9rem; color: var(--bes-marine); }
+  font-size: 0.8rem; background: var(--vert-fonce); color: #FFFFFF; }
+.deficit-nom { font-weight: 700; font-size: 0.9rem; color: var(--vert-fonce); }
 .deficit-detail { font-size: 0.75rem; color: var(--texte-2); margin: 2px 0 5px; }
-.deficit-barre { height: 4px; background: #E8EBF0; }
+.deficit-barre { height: 4px; background: #E8F0EA; }
 .deficit-valeur { font-weight: 700; font-size: 1rem; font-variant-numeric: tabular-nums; }
 .deficit-seuil { font-size: 0.72rem; color: var(--texte-2); }
-.badge-type { font-size: 0.68rem; padding: 1px 7px; border-radius: 999px; background: #E8EBF0; color: var(--bes-marine); }
-.badge-alerte { font-size: 0.68rem; padding: 1px 7px; border-radius: 999px; background: rgba(247, 166, 0, 0.15);
-  color: #9A6700; border: 1px solid rgba(247, 166, 0, 0.5); }
+.badge-type { font-size: 0.68rem; padding: 1px 7px; border-radius: 999px; background: #E8F0EA; color: var(--vert-fonce); }
+.badge-alerte { font-size: 0.68rem; padding: 1px 7px; border-radius: 999px; background: rgba(242, 169, 0, 0.15);
+  color: #9A6700; border: 1px solid rgba(242, 169, 0, 0.5); }
 
 /* --- carte Leaflet */
 .carte-leaflet { position: relative; }
-.carte-leaflet .leaflet-container { background: #E8EBF0; font-family: Roboto, Arial, sans-serif; }
+.carte-leaflet .leaflet-container { background: #E8F0EA; font-family: Roboto, Arial, sans-serif; }
 .carte-leaflet.fond-sombre .leaflet-container { background: #161616; }   /* teinte des tuiles OSM inversées */
 .carte-leaflet.fond-satellite .leaflet-container { background: #1f2a1c; }
 .legende-carte { position: absolute; top: 10px; left: 54px; z-index: 500; pointer-events: none;
   background: rgba(255, 255, 255, 0.94); border: 1px solid var(--bord); border-radius: 6px; padding: 7px 10px;
   font-size: 0.74rem; color: var(--texte); display: flex; flex-direction: column; gap: 4px; min-width: 120px;
-  box-shadow: 0 2px 8px rgba(0, 18, 29, 0.12); }
+  box-shadow: 0 2px 8px rgba(16, 48, 30, 0.12); }
 .legende-carte:empty { display: none; }
 .legende-carte .pastille { display: inline-block; width: 18px; height: 4px; border-radius: 2px; margin-right: 6px;
   vertical-align: middle; }
 .legende-carte .pastille.rond { width: 9px; height: 9px; border-radius: 50%; border: 1px solid #333; }
-.legende-carte .leg-titre { font-weight: 700; color: var(--bes-marine); }
+.legende-carte .leg-titre { font-weight: 700; color: var(--vert-fonce); }
 .legende-carte .rampe { width: 150px; height: 9px; border-radius: 3px; }
 .legende-carte .rampe-graduations { display: flex; justify-content: space-between; width: 150px; color: var(--texte-2); }
-.leaflet-tooltip { background: #FFFFFF; color: var(--texte); border: 1px solid var(--bord); border-left: 3px solid var(--bes-canard);
-  font-size: 12px; box-shadow: 0 4px 14px rgba(0, 18, 29, .18); }
-.leaflet-tooltip b { color: var(--bes-marine); }
+.leaflet-tooltip { background: #FFFFFF; color: var(--texte); border: 1px solid var(--bord); border-left: 3px solid var(--vert);
+  font-size: 12px; box-shadow: 0 4px 14px rgba(16, 48, 30, .18); }
+.leaflet-tooltip b { color: var(--vert-fonce); }
 .leaflet-tooltip-top:before, .leaflet-tooltip-bottom:before, .leaflet-tooltip-left:before,
 .leaflet-tooltip-right:before { display: none; }
 .leaflet-control-attribution { font-size: 10px; }
-.leaflet-bar a { color: var(--bes-marine); }
+.leaflet-bar a { color: var(--vert-fonce); }
 
-/* --- logo entreprise et lien hackathon (en-tête) */
-.logo-entreprise { display: grid; place-items: center; background: #FFFFFF; border-radius: 8px; padding: 4px 8px;
-  height: 48px; flex-shrink: 0; }
-.logo-entreprise img { height: 40px; width: auto; display: block; }
-.lien-hackathon { color: #FFFFFF; font-weight: 700; text-decoration: none; border-bottom: 1px solid var(--bes-orange); }
-.lien-hackathon:hover { color: var(--bes-bleu-clair); }
-.lien-hackathon .bi-trophy-fill { color: var(--bes-jaune); }
-.sous-titre b { color: #FFFFFF; }
-.pied a { color: var(--bes-bleu); font-weight: 600; }
+/* --- logos GETYS et Bouygues E&S (en-tête) */
+.logo-getys { height: 50px; width: auto; display: block; flex-shrink: 0; }
+.logo-entreprise { display: grid; place-items: center; padding: 0 4px 0 14px; margin-left: 4px;
+  border-left: 1px solid var(--bord); height: 40px; flex-shrink: 0; }
+.logo-entreprise img { height: 30px; width: auto; display: block; }
+.pied a { color: var(--vert-texte); font-weight: 600; }
 
 /* --- au-delà du zoom 16.5 : tuiles OpenStreetMap (nettes jusqu'au zoom 19) passées en gris
    pour garder l'aspect neutre des fonds Esri sous les données */
@@ -224,23 +223,23 @@ a { color: var(--bes-bleu); }
 
 /* --- voiles de chargement (ouverture d'une tournée, analyse d'un .tdms) */
 .voile { position: fixed; inset: 0; z-index: 2000; align-items: center; justify-content: center;
-  background: rgba(242, 242, 242, 0.72); backdrop-filter: blur(3px); }
-.voile-boite { background: #FFFFFF; border-radius: 8px; border-top: 4px solid var(--bes-orange);
-  box-shadow: 0 10px 30px rgba(0, 18, 29, 0.18); padding: 26px 34px; display: flex; flex-direction: column;
+  background: rgba(244, 248, 245, 0.75); backdrop-filter: blur(3px); }
+.voile-boite { background: #FFFFFF; border-radius: 8px; border-top: 4px solid var(--lime);
+  box-shadow: 0 10px 30px rgba(16, 48, 30, 0.18); padding: 26px 34px; display: flex; flex-direction: column;
   align-items: center; gap: 10px; min-width: 300px; }
-.voile-anneau { width: 46px; height: 46px; border-radius: 50%; border: 4px solid #E6E9EF;
-  border-top-color: var(--bes-canard); border-right-color: var(--bes-marine); animation: tourne 0.9s linear infinite; }
-.voile-titre { font-weight: 700; color: var(--bes-marine); font-size: 1rem; }
+.voile-anneau { width: 46px; height: 46px; border-radius: 50%; border: 4px solid #E3ECE5;
+  border-top-color: var(--lime); border-right-color: var(--vert); animation: tourne 0.9s linear infinite; }
+.voile-titre { font-weight: 700; color: var(--vert-fonce); font-size: 1rem; }
 .voile-detail { font-size: 0.8rem; color: var(--texte-2); }
 @keyframes tourne { to { transform: rotate(360deg); } }
 
 /* --- vue « Par type de voie » */
-.carte-type { height: 100%; border: 1px solid var(--bord); border-left: 4px solid var(--bes-marine); border-radius: 6px;
+.carte-type { height: 100%; border: 1px solid var(--bord); border-left: 4px solid var(--vert-fonce); border-radius: 6px;
   padding: 10px 12px; background: var(--surface); display: flex; flex-direction: column; gap: 4px; }
-.carte-type-nom { font-weight: 700; color: var(--bes-marine); font-size: 0.92rem; }
+.carte-type-nom { font-weight: 700; color: var(--vert-fonce); font-size: 0.92rem; }
 .carte-type-part { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .carte-type-legende { font-size: 0.75rem; color: var(--texte-2); }
 .carte-type-chiffres { display: flex; gap: 14px; margin-top: 4px; }
 .carte-type-chiffres > div { display: flex; flex-direction: column; font-size: 0.72rem; color: var(--texte-2); }
 .carte-type-chiffres b { font-size: 0.95rem; color: var(--texte); font-variant-numeric: tabular-nums; }
-.carte-type-chiffres .text-danger b { color: var(--bes-orange); }
+.carte-type-chiffres .text-danger b { color: var(--orange); }

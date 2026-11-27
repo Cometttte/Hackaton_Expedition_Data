@@ -71,10 +71,10 @@ def tuiles(fond):
     return calques
 
 
-# Charte Bouygues Energies & Services (palette relevée sur bouygues-es.fr)
-MARINE, BLEU, CANARD, BLEU_CLAIR = "#1C2959", "#005B90", "#0093BB", "#63BEDD"
-VERT, ROUGE, ORANGE = "#00B894", "#E75113", "#F7A600"   # conforme / non conforme / un seul sens mesuré
-AMBRE = CANARD                                             # couleur d'accent des graphiques
+# Charte GETYS (couleurs relevées sur le logo de Getys_Hackathon.pdf)
+VERT_FONCE, VERT_GETYS, LIME = "#1F6E43", "#3E9C61", "#8DBF2E"
+VERT, ROUGE, ORANGE = "#2E9E5B", "#E75113", "#F2A900"   # conforme / non conforme / un seul sens mesuré
+AMBRE = VERT_GETYS                                         # couleur d'accent des graphiques
 CYAN = "#00B5E2"                                           # sélection sur la carte
 CARTE_H = 640
 LUX_MAX = 50                                  # haut de l'échelle des lux (comme carte.html)
@@ -107,10 +107,10 @@ TO84 = Transformer.from_crs(2154, 4326, always_xy=True)
 pio.templates["clair"] = go.layout.Template(pio.templates["plotly_white"])
 pio.templates["clair"].layout.update(
     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-    font=dict(family="Roboto, Arial, sans-serif", color="#333333", size=12),
-    xaxis=dict(gridcolor="#E6E9EF", zerolinecolor="#DDE1E8", linecolor="#BFBFBF"),
-    yaxis=dict(gridcolor="#E6E9EF", zerolinecolor="#DDE1E8", linecolor="#BFBFBF"),
-    hoverlabel=dict(bgcolor="#FFFFFF", bordercolor=CANARD, font_color="#333333"),
+    font=dict(family="Roboto, Arial, sans-serif", color="#26332B", size=12),
+    xaxis=dict(gridcolor="#E3ECE5", zerolinecolor="#DCE7DF", linecolor="#BFCBC2"),
+    yaxis=dict(gridcolor="#E3ECE5", zerolinecolor="#DCE7DF", linecolor="#BFCBC2"),
+    hoverlabel=dict(bgcolor="#FFFFFF", bordercolor=VERT_GETYS, font_color="#26332B"),
 )
 pio.templates.default = "clair"
 BARRE_COULEUR = dict(thickness=12, x=0.99, xanchor="right", len=0.55, bgcolor="rgba(13,17,23,0.75)",
@@ -503,11 +503,11 @@ def chronologie(data):
 
 STYLE_TABLE = dict(
     style_table={"overflowX": "auto", "minWidth": "100%"},
-    style_header={"backgroundColor": MARINE, "color": "#FFFFFF", "fontWeight": "700",
-                  "border": "none", "borderBottom": "2px solid #E75113"},
-    style_filter={"backgroundColor": "#F7F8FA", "color": "#333333"},
-    style_cell={"backgroundColor": "transparent", "color": "#333333", "border": "none",
-                "borderBottom": "1px solid #E6E9EF", "textAlign": "left", "padding": "7px 10px",
+    style_header={"backgroundColor": VERT_FONCE, "color": "#FFFFFF", "fontWeight": "700",
+                  "border": "none", "borderBottom": "2px solid " + LIME},
+    style_filter={"backgroundColor": "#F6FAF7", "color": "#26332B"},
+    style_cell={"backgroundColor": "transparent", "color": "#26332B", "border": "none",
+                "borderBottom": "1px solid #E3ECE5", "textAlign": "left", "padding": "7px 10px",
                 "fontFamily": "Roboto, Arial, sans-serif", "fontSize": "13px", "cursor": "pointer",
                 "whiteSpace": "normal", "height": "auto"},
     style_cell_conditional=[{"if": {"column_id": "nom"}, "minWidth": "190px", "fontWeight": "500"},
@@ -533,7 +533,7 @@ def tableau_troncons(tr):
             sort_action="native", filter_action="native", page_size=12, **STYLE_TABLE,
             style_data_conditional=[
                 {"if": {"filter_query": '{conforme} = false'}, "backgroundColor": "rgba(231,81,19,0.08)"},
-                {"if": {"state": "active"}, "backgroundColor": "rgba(0,147,187,0.12)", "border": "1px solid #0093BB"}],
+                {"if": {"state": "active"}, "backgroundColor": "rgba(62,156,97,0.12)", "border": "1px solid #3E9C61"}],
         ),
     ])
 
@@ -590,7 +590,7 @@ def qualite(data, tr):
                      {"name": "Détail", "id": "detail"}, {"name": "E moy. (lx)", "id": "E_moy"},
                      {"name": "Long. (m)", "id": "longueur_m"}], **STYLE_TABLE,
             style_data_conditional=[{"if": {"state": "active"}, "backgroundColor": "rgba(0,147,187,0.12)",
-                                     "border": "1px solid #0093BB"}]),
+                                     "border": "1px solid #3E9C61"}]),
     ])
 
 
@@ -641,12 +641,14 @@ app.layout = html.Div(className="page", children=[
     html.Header(className="entete", children=dbc.Container(fluid=True, children=dbc.Row(
         align="center", className="g-2", children=[
             dbc.Col(xs=12, lg=True, children=html.Div([
-                # logo officiel (repris du dossier du hackathon, Getys_Hackathon.pdf)
+                # logos repris du dossier du hackathon (Getys_Hackathon.pdf)
+                html.Img(src=app.get_asset_url("logo-getys.jpg"), alt="GETYS — Relevé & visualisé !",
+                         className="logo-getys"),
+                html.Div([html.H1("Clair-Obscur", className="titre mb-0"),
+                          html.Div("Tableau de bord de l'éclairage public", className="sous-titre")]),
                 html.A(html.Img(src=app.get_asset_url("logo-bouygues-es.png"), alt="Bouygues Energies & Services"),
                        href=LIEN_HACKATHON, target="_blank", rel="noopener", className="logo-entreprise",
                        title="Bouygues Energies & Services"),
-                html.Div([html.H1("Clair-Obscur", className="titre mb-0"),
-                          html.Div("Tableau de bord de l'éclairage public", className="sous-titre")]),
             ], className="d-flex align-items-center gap-3")),
             dbc.Col(xs=12, md=6, lg=4, children=dcc.Dropdown(
                 id="choix-rapport", clearable=False, placeholder="Choisir une tournée…",
