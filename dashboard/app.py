@@ -600,8 +600,9 @@ def bruit(data):
     par_motif = ab["motif"].value_counts().to_dict() if ab is not None else {}
     pastille = lambda c: html.Span(className="pastille rond", style={"background": c})  # noqa: E731
     intro = html.Div([
-        html.P([html.B(f"{fmt(k.get('n_aberrants'), dec=0)} valeurs aberrantes retirées"),
-                f" ({fmt(q.get('part_aberrants'), ' %', 2)} des mesures), remplacées par interpolation. "
+        html.P([html.B(f"{fmt(k.get('n_aberrants'), dec=0)} pics aberrants retirés"),
+                f" ({fmt(q.get('part_aberrants'), ' %', 1)} des échantillons bruts à 50 Hz, arrêts compris), "
+                "remplacés par interpolation. "
                 f"Autres corrections : {fmt(q.get('part_negatifs'), ' %', 1)} de mesures négatives ramenées à 0, "
                 f"{fmt(q.get('part_pics'), ' %', 2)} de parasites sur un seul capteur (filtre de Hampel), "
                 f"{fmt(k.get('n_pas_incoh'), dec=0)} passages incohérents écartés (phares, vitrine)."],
@@ -704,9 +705,6 @@ def qualite(data, tr):
         ("HDOP médian / satellites", f"{fmt(q.get('hdop_med'))} / {fmt(q.get('nsat_med'), dec=0)}"),
         ("Décalage d'horloge corrigé", fmt(q.get("decalage_horloge_s"), " s")),
         ("Mesures négatives", fmt(q.get("part_negatifs"), " %", 2)),
-        ("Points aberrants écartés", f"{fmt(k.get('n_aberrants'), dec=0)} ({fmt(q.get('part_aberrants'), ' %', 2)})"),
-        ("Mailles vues plusieurs fois", f"{fmt(k.get('n_multi', k.get('n_hex_multi')), dec=0)} — CV médian "
-                                        f"{fmt(k.get('cv_maille_med', k.get('cv_multi_med')), ' %', 0)}"),
     ]
     m = data["mesures"]
     if m is not None and "lux_brut" in m:
