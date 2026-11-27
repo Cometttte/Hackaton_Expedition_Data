@@ -1,17 +1,17 @@
 """Tableau de bord éclairage public — upload TDMS -> serveur -> affichage des sorties.
 
-Trois lectures des mesures (cf. cahier des charges GETYS) :
+Lectures des mesures (cf. cahier des charges GETYS) :
   * Moyenne au tronçon : filaire OSM, une moyenne par sens de circulation puis moyenne des deux sens
   * Hexagones de 2 m   : bande continue le long du trajet (3 luxmètres décalés latéralement, comme
     getys_spatialisation.py), multi-passages, même règle par sens
-  * Points chauds / froids : valeur moyenne autour de chaque point (méthode de carte.html, getys_rapport.py),
-    rayon fixe en mètres quel que soit le zoom
-  * Heatmap : la page de heatmap_flux.py (dégradé lissé ou 3 capteurs, lampadaires estimés), intégrée telle quelle
+  * Heatmap : la page de heatmap_flux.py (dégradé lissé ou 3 capteurs, lampadaires estimés, export GeoJSON),
+    intégrée telle quelle ; c'est aussi la page du bouton « Carte satellite » (plein écran, fond satellite)
 Carte : Leaflet (dash-leaflet), comme carte.html. Les données de chaque calque sont servies à part (gzip, cache
 navigateur) ; couleurs et seuils SDAL sont appliqués dans le navigateur (assets/carte_leaflet.js).
 La conformité (SDAL : un seuil d'éclairement moyen par type de voie) ne s'applique qu'aux tronçons.
-Conformité SDAL, comparaison avant / après lissage du bruit (colonne E_brut de mesures_pas2m.csv) et couches
-(lampadaires, valeurs aberrantes retirées) : vue Tronçons seulement. Le fond vaut pour toutes les vues.
+Conformité SDAL : vue Tronçons. Comparaison avant / après lissage du bruit (colonne E_brut de mesures_pas2m.csv)
+et valeurs aberrantes retirées : vues Tronçons et Hexagones. Lampadaires estimés : vue Heatmap seulement.
+Le fond vaut pour toutes les vues ; thème clair / sombre (bouton de l'en-tête, mémorisé dans le navigateur).
 """
 import base64
 import gzip
@@ -35,8 +35,12 @@ from flask import Response, abort, request, send_from_directory
 from pyproj import Transformer
 from scipy.spatial import cKDTree
 
+import doc as DOC
 import heatmap_flux as HF
 import hexagones as H
+import operateur as OP
+import rapport_affaires as RA
+import sdal_fichier as SF
 import troncons as T
 
 # ------------------------------------------------------------------ CONFIG
@@ -60,7 +64,7 @@ FONDS = {
 }
 
 
-def tuiles(fond):
+def tuiles(fond, prefixe="tuiles"):
     """Fonds nets à tous les zooms : chaque source n'est affichée que là où elle a de vraies tuiles."""
     # id propre à chaque fond : le calque est recréé (sinon Leaflet garde la tuile OSM sans changer son filtre).
     # Haute résolution (écrans Retina) : detectRetina charge les tuiles du zoom suivant à demi-taille, donc 4x plus
@@ -69,14 +73,16 @@ def tuiles(fond):
     calques = []
     for i, (u, a, nz, zmin, zmax, cl) in enumerate(FONDS[fond]):
         retina = nz >= 19
-        calques.append(dl.TileLayer(id=f"tuiles-{fond}-{i}", url=u, attribution=a, minZoom=zmin, maxZoom=zmax,
+        calques.append(dl.TileLayer(id=f"{prefixe}-{fond}-{i}", url=u, attribution=a, minZoom=zmin, maxZoom=zmax,
                                     maxNativeZoom=nz - 1 if retina else nz, detectRetina=retina, className=cl))
     return calques
 
 
 # Charte GETYS (couleurs relevées sur le logo de Getys_Hackathon.pdf)
 VERT_FONCE, VERT_GETYS, LIME = "#1F6E43", "#3E9C61", "#8DBF2E"
-VERT, ROUGE, ORANGE = "#2E9E5B", "#E75113", "#F2A900"   # conforme / non conforme / un seul sens mesuré
+VERT, ROUGE, ORANGE = "#2E9E5B", "#E75113", "#F2A900"   # couleurs d'état (graphiques, KPI)
+# carte en mode « Conformité SDAL » : sous le seuil en bleu (bleu clair : un seul sens mesuré), conforme jusqu'à
+# 40 lx en vert, plus de 40 lx en rouge
 AMBRE = VERT_GETYS                                         # couleur d'accent des graphiques
 CYAN = "#00B5E2"                                           # sélection sur la carte
 CARTE_H = 640
@@ -138,7 +144,7 @@ def servir_rapport(chemin):
     return send_from_directory(racine, chemin)
 
 
-COUCHES = ("troncons", "hexagones", "points", "lampadaires")
+COUCHES = ("troncons", "hexagones")
 
 
 @app.server.route("/geo/<nom>/<variante>/<couche>.geojson")
@@ -179,22 +185,6 @@ def _geojson(data, couche):
         for k, (feat, r) in enumerate(zip(gj["features"], p.itertuples())):
             f.append({**feat, "properties": {"k": k, "E": _r(r.E_moy), "s1": _r(r.E_sens1),
                                              "s2": _r(r.E_sens2), "np": int(r.n_passages)}})
-    elif couche == "points" and data["mesures"] is not None:
-        m = data["mesures"].sort_values("lux")               # les plus chauds dessinés en dernier (dessus)
-        h = m["heure_locale"] if "heure_locale" in m else pd.Series(np.nan, index=m.index)
-        sens = m["sens"] if "sens" in m else pd.Series(1, index=m.index)
-        for lon, lat, e, sn, hh in zip(m["lon"], m["lat"], m["lux"], sens, h):
-            f.append({"type": "Feature", "geometry": {"type": "Point", "coordinates": [round(lon, 6), round(lat, 6)]},
-                      "properties": {"E": _r(e), "s": int(sn),
-                                     "h": f"{int(hh)}h{int((hh % 1) * 60):02d}" if pd.notna(hh) else ""}})
-    elif couche == "lampadaires" and data["luminaires"] is not None:
-        lum = data["luminaires"]
-        for r in lum.to_dict("records"):
-            f.append({"type": "Feature", "geometry": {"type": "Point", "coordinates": [r["lon"], r["lat"]]},
-                      "properties": {"t": r.get("type", "inconnu"), "lib": r.get("type_libelle", "Luminaire détecté"),
-                                     "w": _r(r.get("puissance_w"), 0), "wmin": _r(r.get("puissance_min_w"), 0),
-                                     "wmax": _r(r.get("puissance_max_w"), 0), "cote": r.get("cote", "–"),
-                                     "pic": _r(r.get("E_pic"), 0), "np": int(r.get("n_passages") or 0)}})
     return {"type": "FeatureCollection", "features": f}
 
 
@@ -227,6 +217,50 @@ def _page_heatmap(dossier, _mtime, brut):
     html_page, *_ = HF.page_heatmap(HF.centres(data["hex"][1]), charger(dossier)["mesures"],
                                      HF.lire_lampadaires(Path(dossier)), Path(dossier).name, brut=data["brut"])
     return html_page.encode("utf-8")
+
+
+@app.server.route("/operateur/<nom>.json")
+def servir_trace_brute(nom):
+    """Vue Opérateur : trace du .tdms brut (valeurs des 3 capteurs à chaque position GPS, heure)."""
+    f = OP.chemin_tdms(f"{nom}.tdms")
+    if f is None:
+        abort(404)
+    corps = _trace_gz(str(f), f.stat().st_mtime)
+    rep = Response(corps, mimetype="application/json")
+    rep.headers.update({"Content-Encoding": "gzip", "Vary": "Accept-Encoding", "Cache-Control": "no-cache"})
+    return rep
+
+
+@lru_cache(maxsize=3)
+def _trace_gz(chemin, _mtime):
+    return gzip.compress(json.dumps(OP.trace(OP.lire_brut(Path(chemin))), separators=(",", ":")).encode(), 6)
+
+
+@app.server.route("/heatmap/<nom>/<fichier>.geojson")
+def servir_heatmap_geojson(nom, fichier):
+    """Exports de la légende de la heatmap : mêmes fichiers que heatmap_flux.py (heatmap_flux.geojson :
+    zones par classe de lux ; heatmap_flux_points.geojson : cellules de 2 m), calculés à la demande."""
+    dossiers = {d.name: d for d in lister_rapports()}
+    brut = fichier.endswith("_brut")
+    quoi = fichier.removesuffix("_brut")
+    if nom not in dossiers or quoi not in ("heatmap_flux", "heatmap_flux_points"):
+        abort(404)
+    d = dossiers[nom]
+    corps = _heatmap_geojson(str(d), d.stat().st_mtime, brut, quoi)
+    rep = Response(corps, mimetype="application/geo+json")
+    rep.headers["Content-Disposition"] = f'attachment; filename="{fichier}_{quote(nom)}.geojson"'
+    return rep
+
+
+@lru_cache(maxsize=4)
+def _heatmap_geojson(dossier, _mtime, brut, quoi):
+    cel = HF.centres(charger(dossier, brut=brut)["hex"][1])
+    if quoi == "heatmap_flux_points":
+        gj = HF.points(cel)
+    else:
+        E, x0, y0 = HF.surface(cel, HF.RES_M, HF.SIGMA_M, HF.RAYON_M)
+        gj = HF.isobandes(E, x0, y0, HF.RES_M)
+    return json.dumps(gj, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 
 
 def url_heatmap(data):
@@ -272,7 +306,7 @@ def charger(dossier, brut=False):
 @lru_cache(maxsize=4)
 def _charger(dossier, _mtime):
     d = Path(dossier)
-    sortie = {"resume": {}, "hex": None, "mesures": None, "supports": None, "luminaires": None, "aberrants": None,
+    sortie = {"resume": {}, "hex": None, "mesures": None, "luminaires": None, "aberrants": None,
               "troncons": None, "geoms": None, "erreur_troncons": None, "arbre_pts": None, "brut": False,
               "nom": d.name, "version": int(_mtime)}
     if (d / "resume.json").exists():
@@ -301,11 +335,6 @@ def _charger(dossier, _mtime):
     # --- hexagones de 2 m : une moyenne par sens de passage, puis moyenne des deux sens
     if sortie["mesures"] is not None:
         sortie["hex"] = H.calculer(sortie["mesures"])
-    if (d / "supports.csv").exists():
-        s = lire_csv(d / "supports.csv")
-        if "suspect" in s:
-            s["suspect"] = s["suspect"].map(en_bool)
-        sortie["supports"] = s
     lum_f = d / "lampadaires_estimes.geojson"                 # analyse actuelle
     if not lum_f.exists():
         lum_f = d / "luminaires_detectes.geojson"            # anciens rapports
@@ -400,10 +429,14 @@ def fmt(v, suffixe="", dec=1):
     return f"{v}{suffixe}"
 
 
-def avec_seuils(tr, sdal):
-    """Ajoute le seuil SDAL et la conformité à chaque tronçon."""
+def avec_seuils(tr, sdal, rues=None):
+    """Ajoute le seuil SDAL et la conformité à chaque tronçon. rues : {nom normalisé: seuil} (fichier SDAL par
+    rue), prioritaire sur le seuil du type de voie."""
     tr = tr.copy()
     tr["seuil"] = tr["classe"].map(lambda c: sdal.get(c, T.CLASSES[c][2]))
+    if rues:
+        propre = tr["nom"].map(lambda n: rues.get(SF.normaliser(n)))
+        tr["seuil"] = propre.fillna(tr["seuil"]).astype(float)
     tr["conforme"] = tr["E_moy"] >= tr["seuil"]
     tr["ratio"] = tr["E_moy"] / tr["seuil"]
     tr["a_completer"] = (tr["n_sens"] < 2) & ~tr["sens_unique"].astype(bool)
@@ -476,8 +509,9 @@ def legende(mode, couleur, couches, data):
         return blocs
     if mode == "troncons" and couleur == "conformite":
         blocs.append(html.Div([html.Div([html.Span(className="pastille", style={"background": c}), t])
-                               for t, c in (("Conforme", VERT), ("Non conforme", ROUGE),
-                                            ("Non conforme · 1 seul sens", ORANGE))]))
+                               for t, c in ((f"Plus de {RA.LUX_ROUGE} lx", RA.ROUGE_FORT),
+                                            (f"Conforme, jusqu'à {RA.LUX_ROUGE} lx", RA.CONFORME),
+                                            ("Sous le seuil", RA.SOUS), ("Sous le seuil · 1 seul sens", RA.SOUS_1S))]))
     elif mode == "troncons":
         blocs.append(html.Div([html.Div([html.Span(className="pastille", style={"background": c}),
                                          f"{PALIERS[i]:g}–{PALIERS[i + 1]:g} lx" if PALIERS[i + 1] < math.inf
@@ -488,11 +522,6 @@ def legende(mode, couleur, couches, data):
         blocs.append(html.Div([html.Div("lux", className="leg-titre"),
                                html.Div(className="rampe", style={"background": f"linear-gradient(90deg, {rampe})"}),
                                html.Div([html.Span("0"), html.Span("25"), html.Span("50")], className="rampe-graduations")]))
-    lum = data["luminaires"] if data else None
-    if "lum" in (couches or []) and lum is not None and "type" in lum:
-        blocs.append(html.Div([html.Div("Lampadaires estimés", className="leg-titre mt-1")] +
-                              [html.Div([html.Span(className="pastille rond", style={"background": COUL_TYPES.get(t, "#fff")}),
-                                         f"{t.replace('_', ' ')} ({n})"]) for t, n in lum["type"].value_counts().items()]))
     ab = data["aberrants"] if data else None
     if "ab" in (couches or []) and ab is not None:
         blocs.append(html.Div([html.Div("Valeurs aberrantes retirées", className="leg-titre mt-1")] +
@@ -639,6 +668,7 @@ def chronologie(data):
                                hovertemplate="%{text} — %{y:.1f} lx<extra></extra>"))
     pas = list(range(int(t["h"].min()), int(t["h"].max()) + 2))
     fig.update_layout(height=360, margin=dict(l=10, r=10, t=10, b=30), yaxis_title="lux moyen (1 min)",
+                      hovermode="x",                     # clic n'importe où à la verticale d'une heure
                       xaxis=dict(tickvals=pas, ticktext=[f"{h}h" for h in pas], title="heure locale"))
     return fig
 
@@ -647,9 +677,9 @@ STYLE_TABLE = dict(
     style_table={"overflowX": "auto", "minWidth": "100%"},
     style_header={"backgroundColor": VERT_FONCE, "color": "#FFFFFF", "fontWeight": "700",
                   "border": "none", "borderBottom": "2px solid " + LIME},
-    style_filter={"backgroundColor": "#F6FAF7", "color": "#26332B"},
-    style_cell={"backgroundColor": "transparent", "color": "#26332B", "border": "none",
-                "borderBottom": "1px solid #E3ECE5", "textAlign": "left", "padding": "7px 10px",
+    style_filter={"backgroundColor": "var(--surface-2)", "color": "var(--texte)"},
+    style_cell={"backgroundColor": "transparent", "color": "var(--texte)", "border": "none",
+                "borderBottom": "1px solid var(--bord)", "textAlign": "left", "padding": "7px 10px",
                 "fontFamily": "Roboto, Arial, sans-serif", "fontSize": "13px", "cursor": "pointer",
                 "whiteSpace": "normal", "height": "auto"},
     style_cell_conditional=[{"if": {"column_id": "nom"}, "minWidth": "190px", "fontWeight": "500"},
@@ -765,8 +795,120 @@ champs_sdal = [
                                 dbc.InputGroupText("lx", className="py-0 small")], size="sm"), width=5),
     ]) for c, (lib, _, v) in T.CLASSES.items()]
 
+def legende_operateur():
+    rampe = ", ".join(f"rgb{c} {2 * v}%" for v, c in STOPS)
+    return [html.Div("3 capteurs · lux bruts", className="leg-titre"),
+            html.Div(className="rampe", style={"background": f"linear-gradient(90deg, {rampe})"}),
+            html.Div([html.Span("0"), html.Span("25"), html.Span("50+")], className="rampe-graduations"),
+            html.Div("3 rangées dans le sens de marche : L3 à gauche, L2 au centre, L1 à droite"),
+            html.Div("écartement agrandi quand on dézoome", className="text-muted")]
+
+
+def page_operateur():
+    """Vue Opérateur : le .tdms brut sur la carte (sans analyse), contrôles, points annotés et notes."""
+    return dbc.Container(fluid=True, className="contenu", children=[
+        html.Div(className="contexte", children=[
+            html.I(className="bi bi-info-circle me-1"),
+            "Contrôle de la tournée : données brutes du .tdms uniquement. Les 3 luxmètres côte à côte, "
+            "une valeur par position GPS (5 par seconde), sans moyenne, lissage ni filtre. Vérifiez que tout le "
+            "secteur est couvert et qu'aucun capteur n'a décroché."]),
+        dbc.Row(className="g-3", children=[
+            dbc.Col(xl=8, children=dbc.Card(className="bloc", children=[
+                dbc.CardHeader(html.Div(className="barre-outils", children=[
+                    html.Div(className="outil", children=[
+                        html.Span("Fichier .tdms de la tournée", className="outil-titre"),
+                        html.Span(id="op-nom", className="fw-semibold")]),
+                    dbc.Checklist(id="op-mode-note", value=[], switch=True, className="small outil-couches",
+                                  options=[{"label": "Ajouter un point au clic", "value": "on"}]),
+                ])),
+                dcc.Store(id="op-fichier"), html.Div(id="op-etat"),
+                dcc.Store(id="op-trace-url"), html.Div(id="op-trace-dessin", hidden=True),
+                dbc.CardBody(html.Div(id="op-cadre", className="carte-leaflet fond-clair", children=[
+                    # zoom par paliers entiers : les images satellite sont affichées à leur taille exacte
+                    dl.Map(id="op-carte", center=[48.785, 2.54], zoom=14, zoomSnap=1, preferCanvas=True,
+                           maxZoom=ZOOM_MAX, style={"height": f"{CARTE_H}px", "width": "100%"}, children=[
+                               dl.LayerGroup(id="op-fonds", children=tuiles("clair", "op-tuiles")),
+                               dl.LayerGroup(id="op-marqueurs"),
+                               dl.ScaleControl(position="bottomright", imperial=False)]),
+                    html.Div(legende_operateur(), className="legende-carte")]), className="p-0"),
+            ])),
+            dbc.Col(xl=4, className="d-flex flex-column gap-3", children=[
+                carte_bloc("Contrôles de la tournée", "clipboard-check", html.Div(id="op-controles")),
+                carte_bloc("Points annotés", "pin-map", [
+                    html.Div(id="op-form", style={"display": "none"}, className="mb-2", children=[
+                        html.Div(id="op-coord", className="small text-muted mb-1"), dcc.Store(id="op-attente"),
+                        dbc.Textarea(id="op-texte", rows=2, placeholder="Commentaire (ex. lampadaire éteint, "
+                                     "travaux, rue non parcourue…)", className="mb-2"),
+                        dbc.Button([html.I(className="bi bi-plus-lg me-1"), "Ajouter le point"], id="op-ajouter",
+                                   size="sm", color="success")]),
+                    html.Div(id="op-liste"),
+                    html.Div("Activez « Ajouter un point au clic » puis cliquez sur la carte.",
+                             className="small text-muted"),
+                ]),
+                carte_bloc("Notes de la tournée", "journal-text", [
+                    dbc.Textarea(id="op-notes", rows=5, placeholder="Conditions, incidents, secteurs à repasser…"),
+                    html.Div(className="d-flex align-items-center gap-2 mt-2", children=[
+                        dbc.Button("Enregistrer", id="op-enregistrer", size="sm", color="success"),
+                        html.Span(id="op-notes-etat", className="small text-muted")])]),
+            ]),
+        ]),
+    ])
+
+
+def page_affaires():
+    """Vue Chargé d'affaires : rapport à composer (sections cochées) pour la tournée choisie en haut."""
+    return dbc.Container(fluid=True, className="contenu", children=[
+        html.Div(className="contexte", children=[
+            html.I(className="bi bi-info-circle me-1"),
+            "Rapport de la tournée choisie en haut de la page. Une première sélection est proposée : cochez ce que vous "
+            "voulez y mettre, ajoutez vos informations, puis téléchargez-le (PDF : Fichier → Imprimer depuis le "
+            "navigateur)."]),
+        dbc.Row(className="g-3", children=[
+            dbc.Col(xl=4, className="d-flex flex-column gap-3", children=[
+                carte_bloc("Contenu du rapport", "list-check", [
+                    dbc.Checklist(id="ra-sections", value=RA.DEFAUT, className="small",
+                                  options=[{"label": lib, "value": cle} for cle, lib, _ in RA.SECTIONS]),
+                    dbc.Button("Revenir à la sélection proposée", id="ra-defaut", size="sm", color="link",
+                               className="px-0 mt-1")]),
+                carte_bloc("Informations", "pencil-square", [
+                    dbc.Label("Titre", className="small mb-0"),
+                    dbc.Input(id="ra-titre", size="sm", placeholder="Diagnostic de l'éclairage public — <commune>"),
+                    dbc.Label("Destinataire", className="small mb-0 mt-2"),
+                    dbc.Input(id="ra-destinataire", size="sm", placeholder="Mairie de …"),
+                    dbc.Label("Établi par", className="small mb-0 mt-2"),
+                    dbc.Input(id="ra-auteur", size="sm", placeholder="Nom, Bouygues Energies & Services"),
+                    dbc.Label("Commentaire / recommandations", className="small mb-0 mt-2"),
+                    dbc.Textarea(id="ra-commentaire", rows=5),
+                    html.Div(className="d-flex gap-2 mt-3", children=[
+                        dbc.Button([html.I(className="bi bi-eye me-1"), "Aperçu"], id="ra-apercu", size="sm",
+                                   color="success", outline=True),
+                        dbc.Button([html.I(className="bi bi-download me-1"), "Télécharger le rapport"],
+                                   id="ra-telecharger", size="sm", color="success")]),
+                    dcc.Download(id="ra-download")]),
+            ]),
+            dbc.Col(xl=8, children=carte_bloc("Aperçu du rapport", "file-earmark-richtext", dcc.Loading(
+                html.Iframe(id="ra-cadre", className="cadre-rapport"), type="dot", color=AMBRE), className="p-0")),
+        ]),
+    ])
+
+
+def page_doc():
+    """Onglet Doc : techniques et algorithmes, stack technique, explication détaillée du code."""
+    complet = DOC.texte_complet()
+    return dbc.Container(fluid=True, className="contenu doc", children=dbc.Row(className="g-3", children=[
+        dbc.Col(xl=7, children=carte_bloc("Techniques et algorithmes", "cpu", dcc.Markdown(DOC.ALGORITHMES))),
+        dbc.Col(xl=5, className="d-flex flex-column gap-3", children=[
+            carte_bloc("Stack technique", "stack", dcc.Markdown(DOC.STACK)),
+            carte_bloc("Explication détaillée du code", "journal-code", html.Details([
+                html.Summary("EXPLICATION_DU_CODE.md"), dcc.Markdown(complet)]) if complet else
+                html.P("Fichier EXPLICATION_DU_CODE.md absent.", className="text-muted small")),
+        ]),
+    ]))
+
+
 app.layout = html.Div(className="page", children=[
     dcc.Store(id="selection"), html.Div(id="defilement", hidden=True),
+    dcc.Store(id="theme", storage_type="local", data="clair"), html.Div(id="theme-applique", hidden=True),
     dcc.Store(id="urls-prechargement"), html.Div(id="prechargement", hidden=True),
     html.Div(id="fond-vectoriel", hidden=True),
     # voiles de chargement : ouverture d'une tournée / analyse d'une nouvelle tournée
@@ -795,18 +937,33 @@ app.layout = html.Div(className="page", children=[
             dbc.Col(xs=12, md=6, lg=4, children=dcc.Dropdown(
                 id="choix-rapport", clearable=False, placeholder="Choisir une tournée…",
                 className="choix-rapport")),
-            dbc.Col(xs="auto", children=html.A([html.I(className="bi bi-file-earmark-text me-1"),
-                                                 "Rapport complet"], id="lien-rapport", target="_blank",
-                                                className="btn btn-outline-light btn-sm disabled")),
             dbc.Col(xs="auto", children=html.A([html.I(className="bi bi-globe-europe-africa me-1"),
                                                  "Carte satellite"], id="lien-carte", target="_blank",
                                                 className="btn btn-outline-light btn-sm disabled")),
             dbc.Col(xs="auto", children=dbc.Button([html.I(className="bi bi-cloud-arrow-up me-1"),
                                                      "Nouvelle tournée"], id="btn-nouvelle",
                                                     color="warning", size="sm", className="fw-semibold")),
+            dbc.Col(xs="auto", children=html.Button(html.I(id="icone-theme", className="bi bi-moon-stars"),
+                                                    id="btn-theme", className="btn btn-outline-light btn-sm bouton-theme",
+                                                    title="Mode sombre", **{"aria-label": "Changer de mode clair / sombre"})),
         ]))),
 
-    dbc.Container(fluid=True, className="contenu", children=[
+    # --- vues par rôle
+    html.Nav(className="barre-pages", children=dbc.Container(fluid=True, children=dbc.RadioItems(
+        id="page", value="analyste", persistence=True, persistence_type="session",
+        className="btn-group btn-group-sm segmente pages", inputClassName="btn-check",
+        labelClassName="btn btn-outline-secondary", labelCheckedClassName="active", options=[
+            {"label": [html.I(className="bi bi-truck me-1"), "Opérateur"], "value": "operateur"},
+            {"label": [html.I(className="bi bi-graph-up me-1"), "Analyste"], "value": "analyste"},
+            {"label": [html.I(className="bi bi-briefcase me-1"), "Chargé d'affaires"], "value": "affaires"},
+            {"label": [html.I(className="bi bi-book me-1"), "Doc"], "value": "doc"}]))),
+    dcc.Store(id="sdal-rues", data={}),
+
+    html.Div(id="page-operateur", style={"display": "none"}, children=page_operateur()),
+    html.Div(id="page-affaires", style={"display": "none"}, children=page_affaires()),
+    html.Div(id="page-doc", style={"display": "none"}, children=page_doc()),
+
+    html.Div(id="page-analyste", children=dbc.Container(fluid=True, className="contenu", children=[
         html.Div(id="contexte", className="contexte"),
         dcc.Loading(html.Div(id="message"), type="dot", color=AMBRE),
         dbc.Row(id="kpis", className="g-3 mb-3"),
@@ -818,8 +975,6 @@ app.layout = html.Div(className="page", children=[
                     segmente("mode-carte", "troncons", [
                         {"label": [html.I(className="bi bi-bezier2 me-1"), "Tronçons"], "value": "troncons"},
                         {"label": [html.I(className="bi bi-hexagon me-1"), "Hexagones"], "value": "hex"},
-                        {"label": [html.I(className="bi bi-record-circle me-1"), "Points chauds / froids"],
-                         "value": "points"},
                         {"label": [html.I(className="bi bi-thermometer-half me-1"), "Heatmap"],
                          "value": "heatmap"}], "Vue"),
                     segmente("couleur-carte", "eclairement", [
@@ -828,15 +983,27 @@ app.layout = html.Div(className="page", children=[
                     segmente("lissage", "apres", [
                         {"label": [html.I(className="bi bi-soundwave me-1"), "Avant"], "value": "avant"},
                         {"label": [html.I(className="bi bi-activity me-1"), "Après lissage"], "value": "apres"}],
-                        "Bruit"),
+                        "Bruit (tronçons, hexagones)"),
                     segmente("fond", "clair", [
                         {"label": [html.I(className="bi bi-moon-stars me-1"), "Sombre"], "value": "sombre"},
                         {"label": [html.I(className="bi bi-sun me-1"), "Clair"], "value": "clair"},
                         {"label": [html.I(className="bi bi-globe-europe-africa me-1"), "Satellite"],
                          "value": "satellite"}], "Fond"),
+                    html.Div(id="outil-export", className="outil", style={"display": "none"}, children=[
+                        html.Span("Export", className="outil-titre"),
+                        dbc.DropdownMenu(label=[html.I(className="bi bi-download me-1"), "Exporter en GeoJSON"],
+                                         size="sm", color="light", className="menu-export", children=[
+                            dbc.DropdownMenuItem([html.Div("Zones par classe de lux", className="fw-semibold"),
+                                                  html.Div("surface lissée : un MultiPolygon par classe",
+                                                           className="small text-muted")],
+                                                 id="export-zones", external_link=True),
+                            dbc.DropdownMenuItem([html.Div("Cellules de 2 m", className="fw-semibold"),
+                                                  html.Div("points : moyenne et valeur de chaque sens",
+                                                           className="small text-muted")],
+                                                 id="export-cellules", external_link=True),
+                        ])]),
                     dbc.Checklist(id="couches", value=[], switch=True, className="small outil-couches",
-                                  options=[{"label": "Lampadaires estimés", "value": "lum"},
-                                           {"label": "Valeurs aberrantes", "value": "ab"}]),
+                                  options=[{"label": "Valeurs aberrantes", "value": "ab"}]),
                 ])),
                 html.Div(id="bandeau-lissage"),
                 dbc.CardBody(html.Div(id="cadre-carte", className="carte-leaflet fond-clair", children=[
@@ -847,9 +1014,6 @@ app.layout = html.Div(className="page", children=[
                                dl.GeoJSON(id="geo-troncons", data=VIDE, style=fn("styleTroncon"),
                                           onEachFeature=fn("infoTroncon"), hideout={}),
                                dl.GeoJSON(id="geo-hex", data=VIDE, style=fn("styleHex"), onEachFeature=fn("infoHex")),
-                               dl.GeoJSON(id="geo-points", data=VIDE, pointToLayer=fn("pointChaud")),
-                               dl.GeoJSON(id="geo-lampes", data=VIDE, pointToLayer=fn("lampe"),
-                                          onEachFeature=fn("infoLampe")),
                                dl.LayerGroup(id="groupe-aberrants"),
                                dl.LayerGroup(id="groupe-selection"),
                                dl.ScaleControl(position="bottomright", imperial=False),
@@ -873,6 +1037,13 @@ app.layout = html.Div(className="page", children=[
                                                             "Google Maps"])),
                 carte_bloc("SDAL — seuils par type de voie", "sliders", [
                     *champs_sdal,
+                    html.Hr(className="my-2"),
+                    dcc.Upload(id="sdal-upload", accept=".csv,.txt", className="sdal-upload", children=html.Div(
+                        [html.I(className="bi bi-filetype-csv me-1"), "Importer un fichier SDAL (.csv)"])),
+                    html.Div(className="small text-muted mt-1", children=[
+                        "Par type de voie (colonnes ", html.Code("type;seuil"), ") ou par rue (", html.Code("rue;seuil"),
+                        ") : le seuil d'une rue remplace celui de son type."]),
+                    html.Div(id="sdal-message", className="small mt-1"),
                 ]),
             ]),
         ]),
@@ -891,7 +1062,10 @@ app.layout = html.Div(className="page", children=[
                     html.Div(id="tableau"),
                     html.Div(id="p-distrib"),
                     html.Div(dcc.Graph(id="lampes", config={"displayModeBar": False}), id="p-lampes"),
-                    html.Div(dcc.Graph(id="chrono", config={"displayModeBar": False}), id="p-chrono"),
+                    html.Div([html.Div([html.I(className="bi bi-cursor me-1"), "Cliquez une heure : la carte montre "
+                                        "l'endroit où passait le véhicule et Street View s'y ouvre."],
+                                       className="small text-muted mb-1"),
+                              dcc.Graph(id="chrono", config={"displayModeBar": False})], id="p-chrono"),
                     html.Div(id="qualite"),
                     html.Div(id="bruit"),
                 ]),
@@ -901,7 +1075,7 @@ app.layout = html.Div(className="page", children=[
                             rel="noopener"), " · équipe Clair-Obscur · mesures GETYS · lampadaires estimés et "
                      "palette de carte.html (getys_rapport.py) · filaire © contributeurs OpenStreetMap"],
                     className="pied"),
-    ]),
+    ])),
 
     # --- envoi d'une nouvelle tournée
     dbc.Modal(id="fenetre-envoi", is_open=False, centered=True, size="lg", children=[
@@ -922,8 +1096,13 @@ app.layout = html.Div(className="page", children=[
     ]),
 ])
 
-SDAL_INPUTS = [Input(f"sdal-{c}", "value") for c in T.CLASSES]
+SDAL_INPUTS = [Input(f"sdal-{c}", "value") for c in T.CLASSES] + [Input("sdal-rues", "data")]
 SDAL_STATES = [State(f"sdal-{c}", "value") for c in T.CLASSES]
+
+
+def rues_de(valeurs):
+    """Seuils par rue (fichier SDAL importé) : dernière valeur de SDAL_INPUTS."""
+    return (valeurs[len(T.CLASSES)] if len(valeurs) > len(T.CLASSES) else None) or {}
 
 
 def sdal_de(valeurs):
@@ -991,22 +1170,17 @@ def envoyer(n_lancer, contenu, nom, actuel):
     return msg, options, valeur, False
 
 
-@app.callback(Output("lien-rapport", "href"), Output("lien-rapport", "className"),
-              Output("lien-carte", "href"), Output("lien-carte", "className"), Output("urls-prechargement", "data"),
+@app.callback(Output("lien-carte", "href"), Output("lien-carte", "className"), Output("urls-prechargement", "data"),
               Input("choix-rapport", "value"))
 def liens_rapport(dossier):
-    """Liens vers rapport.html et carte.html produits par getys_rapport.py + URL des hexagones à précharger."""
+    """« Carte satellite » : la heatmap de heatmap_flux.py en plein écran sur fond satellite (même page que la vue
+    Heatmap) ; URL des calques à précharger. Le rapport se compose dans la vue Chargé d'affaires."""
     classe = "btn btn-outline-light btn-sm"
-    sortie = []
-    for f in ("rapport.html", "carte.html"):
-        if dossier and (Path(dossier) / f).exists():
-            sortie += [f"/rapport/{Path(dossier).name}/{f}", classe]
-        else:
-            sortie += [None, classe + " disabled"]
     if not dossier:
-        return sortie + [None]
+        return None, classe + " disabled", None
     data = charger(dossier)
-    return sortie + [[url_couche(data, c) for c in ("hexagones", "points")]]
+    carte = f"{url_heatmap(charger(dossier, brut=False))}#fond=satellite" if data["hex"] is not None else None
+    return carte, classe if carte else classe + " disabled", [url_couche(data, "hexagones")]
 
 
 # « Lancer l'analyse » : la fenêtre se ferme et l'écran d'analyse s'affiche tout de suite, dans le navigateur
@@ -1074,7 +1248,7 @@ def afficher(dossier, *valeurs):
     data = charger(dossier)
     meta = data["resume"].get("meta", {})
     k = data["resume"].get("kpi", {})
-    tr = avec_seuils(data["troncons"], sdal) if data["troncons"] is not None else None
+    tr = avec_seuils(data["troncons"], sdal, rues_de(valeurs)) if data["troncons"] is not None else None
 
     contexte = html.Div([
         html.Span([html.I(className="bi bi-geo-alt me-1"), meta.get("ville", Path(dossier).name)]),
@@ -1121,16 +1295,15 @@ def afficher(dossier, *valeurs):
 # Leaflet garde sa vue : rien ne bouge quand on change de filtre.
 @app.callback(Output("geo-troncons", "url"), Output("geo-troncons", "data"),
               Output("geo-hex", "url"), Output("geo-hex", "data"),
-              Output("geo-points", "url"), Output("geo-points", "data"),
               Output("bandeau-lissage", "children"),
               Input("choix-rapport", "value"), Input("mode-carte", "value"), Input("lissage", "value"))
 def afficher_calques(dossier, mode, lissage):
     if not dossier:
-        return None, VIDE, None, VIDE, None, VIDE, None
-    brut = lissage == "avant" and mode == "troncons"       # avant / après : vue Tronçons seulement
+        return None, VIDE, None, VIDE, None
+    brut = lissage == "avant" and mode in ("troncons", "hex")   # avant / après : tronçons et hexagones
     data = charger(dossier, brut=brut)
     sortie = []
-    for m, couche in (("troncons", "troncons"), ("hex", "hexagones"), ("points", "points")):
+    for m, couche in (("troncons", "troncons"), ("hex", "hexagones")):
         sortie += [url_couche(data, couche), None] if mode == m else [None, VIDE]
     bandeau = []                                   # messages d'erreur uniquement
     if mode == "troncons" and data["troncons"] is None:
@@ -1151,17 +1324,16 @@ def afficher_calques(dossier, mode, lissage):
               *SDAL_INPUTS)
 def colorer_troncons(couleur, mode, *valeurs):
     """Mode de couleur et seuils SDAL : appliqués par la fonction de style dans le navigateur."""
-    return {"couleur": couleur if mode == "troncons" else "eclairement", "sdal": sdal_de(valeurs)}
+    return {"couleur": couleur if mode == "troncons" else "eclairement", "sdal": sdal_de(valeurs), "rues": rues_de(valeurs)}
 
 
-@app.callback(Output("geo-lampes", "url"), Output("geo-lampes", "data"), Output("groupe-aberrants", "children"),
+@app.callback(Output("groupe-aberrants", "children"),
               Input("couches", "value"), Input("choix-rapport", "value"), Input("mode-carte", "value"))
 def afficher_couches(couches, dossier, mode):
-    """Lampadaires estimés et valeurs aberrantes retirées : par-dessus la vue Tronçons seulement."""
-    couches = (couches or []) if dossier and mode == "troncons" else []
-    data = charger(dossier) if dossier else None
-    lampes = (url_couche(data, "lampadaires"), None) if "lum" in couches else (None, VIDE)
-    return (*lampes, marqueurs_aberrants(data["aberrants"]) if "ab" in couches else [])
+    """Valeurs aberrantes retirées par le filtrage : par-dessus les vues Tronçons et Hexagones."""
+    if not dossier or mode not in ("troncons", "hex") or "ab" not in (couches or []):
+        return []
+    return marqueurs_aberrants(charger(dossier)["aberrants"])
 
 
 @app.callback(Output("carte-heatmap", "src"), Output("carte-heatmap", "style"),
@@ -1171,22 +1343,60 @@ def afficher_heatmap(dossier, mode, fond):
     la page n'est pas rechargée. Page générée au premier affichage seulement."""
     if not dossier or mode != "heatmap":
         return dash.no_update, {"display": "none"}
-    return f"{url_heatmap(charger(dossier))}#fond={fond}", {"display": "block"}
+    return f"{url_heatmap(charger(dossier))}#fond={fond}&integre=1", {"display": "block"}
+
+
+@app.callback(Output("export-zones", "href"), Output("export-cellules", "href"), Input("choix-rapport", "value"))
+def liens_export(dossier):
+    """Exports GeoJSON de la heatmap (mêmes fichiers que heatmap_flux.py), téléchargés depuis la barre d'outils."""
+    if not dossier:
+        return None, None
+    base = f"/heatmap/{quote(Path(dossier).name)}"
+    return f"{base}/heatmap_flux.geojson", f"{base}/heatmap_flux_points.geojson"
+
+
+@app.callback(Output("outil-export", "style"), Input("mode-carte", "value"))
+def montrer_export(mode):
+    return {} if mode == "heatmap" else {"display": "none"}
 
 
 @app.callback(Output("outil-couleur-carte", "style"), Output("outil-lissage", "style"), Output("couches", "style"),
               Input("mode-carte", "value"))
 def montrer_outils(mode):
-    """Couleur (conformité SDAL), avant / après lissage et couches : vue Tronçons seulement."""
-    s = {} if mode == "troncons" else {"display": "none"}
-    return s, s, s
+    """Couleur (conformité SDAL) : Tronçons. Avant / après lissage et valeurs aberrantes : Tronçons et Hexagones."""
+    cache = {"display": "none"}
+    deux = {} if mode in ("troncons", "hex") else cache
+    return ({} if mode == "troncons" else cache), deux, deux
 
 
 @app.callback(Output("legende", "children"), Input("mode-carte", "value"), Input("couleur-carte", "value"),
               Input("couches", "value"), Input("choix-rapport", "value"))
 def afficher_legende(mode, couleur, couches, dossier):
-    return legende(mode, couleur if mode == "troncons" else "eclairement", couches if mode == "troncons" else [],
-                   charger(dossier) if dossier else None)
+    return legende(mode, couleur if mode == "troncons" else "eclairement",
+                   couches if mode in ("troncons", "hex") else [], charger(dossier) if dossier else None)
+
+
+# thème clair / sombre : bouton de l'en-tête, mémorisé dans le navigateur (dcc.Store local)
+app.clientside_callback(
+    """function(n, theme) { return n ? (theme === 'sombre' ? 'clair' : 'sombre') : window.dash_clientside.no_update; }""",
+    Output("theme", "data"), Input("btn-theme", "n_clicks"), State("theme", "data"), prevent_initial_call=True)
+app.clientside_callback(
+    """function(theme) {
+        const sombre = theme === 'sombre', h = document.documentElement;
+        h.setAttribute('data-theme', sombre ? 'sombre' : 'clair');
+        h.setAttribute('data-bs-theme', sombre ? 'dark' : 'light');
+        return [sombre ? 'bi bi-sun' : 'bi bi-moon-stars', sombre ? 'Mode clair' : 'Mode sombre', ''];
+    }""",
+    Output("icone-theme", "className"), Output("btn-theme", "title"), Output("theme-applique", "children"),
+    Input("theme", "data"))
+
+
+@app.callback(Output("fond", "value"), Input("theme", "data"), State("fond", "value"))
+def fond_selon_theme(theme, fond):
+    """Le fond de carte suit le thème (sauf satellite, choisi exprès)."""
+    if fond == "satellite":
+        return dash.no_update
+    return "sombre" if theme == "sombre" else "clair"
 
 
 app.clientside_callback(
@@ -1236,16 +1446,27 @@ def _selection_troncon(data, tid, titre_extra=None):
 
 
 @app.callback(Output("selection", "data"),
-              Input("geo-troncons", "clickData"), Input("geo-hex", "clickData"), Input("geo-points", "clickData"),
-              Input("geo-lampes", "clickData"),
+              Input("geo-troncons", "clickData"), Input("geo-hex", "clickData"),
               Input("table-troncons", "active_cell"), Input("table-qualite", "active_cell"),
               Input("table-aberrants", "active_cell"), Input({"type": "aberrant", "k": ALL}, "n_clicks"),
+              Input("chrono", "clickData"),
               State("choix-rapport", "value"), prevent_initial_call=True)
-def choisir_point(clic_tr, clic_hex, clic_pt, clic_lampe, cellule, cellule_q, cellule_ab, clics_ab, dossier):
+def choisir_point(clic_tr, clic_hex, cellule, cellule_q, cellule_ab, clics_ab, clic_chrono, dossier):
     if not dossier:
         return dash.no_update
     data = charger(dossier)
     src = ctx.triggered_id
+    if src == "chrono":                                  # chronologie : lieu du véhicule à l'heure cliquée
+        m = data["mesures"]
+        if not clic_chrono or m is None or "heure_locale" not in m:
+            return dash.no_update
+        h = float(clic_chrono["points"][0]["x"])
+        i = int(np.argmin(np.abs(((m["heure_locale"].to_numpy(float) - h + 12) % 24) - 12)))
+        p = m.iloc[i]
+        hh = float(p["heure_locale"])
+        return {"lat": float(p["lat"]), "lon": float(p["lon"]), "cap": float(p.get("cap", 0) or 0), "centrer": True,
+                "zoom": 17.5, "titre": f"Chronologie — {int(hh)}h{int(round(hh % 1 * 60)) % 60:02d}",
+                "detail": f"{fmt(p['lux'], ' lx')} mesurés à cet instant"}
     # valeur aberrante retirée : ligne de l'onglet « Bruit et valeurs aberrantes » ou cercle de la carte
     k_ab = None
     if src == "table-aberrants" and cellule_ab:
@@ -1264,7 +1485,7 @@ def choisir_point(clic_tr, clic_hex, clic_pt, clic_lampe, cellule, cellule_q, ce
                 "titre": f"⚠ Valeur aberrante retirée — {a['motif']}",
                 "detail": f"pic {fmt(a['pic_lx'], ' lx', 0)} (fond {fmt(a['fond_lx'], ' lx', 0)}) · largeur "
                           f"{fmt(a['largeur_m'], ' m')} · {a['heure']} · position {a['precision']}"}
-    clics = {"geo-troncons": clic_tr, "geo-hex": clic_hex, "geo-points": clic_pt, "geo-lampes": clic_lampe}
+    clics = {"geo-troncons": clic_tr, "geo-hex": clic_hex}
     clic = clics.get(src) if isinstance(src, str) else None
     if clic:
         p, geo = clic.get("properties") or {}, clic.get("geometry") or {}
@@ -1285,11 +1506,6 @@ def choisir_point(clic_tr, clic_hex, clic_pt, clic_lampe, cellule, cellule_q, ce
                     f"sens 1 : {fmt(p.get('s1'), ' lx')} · sens 2 : {fmt(p.get('s2'), ' lx')}")
             sel.update(titre=p["n"], detail=f"{fmt(p.get('E'), ' lx')} · {sens}", tid=p["id"],
                        tr_lat=list(glat), tr_lon=list(glon))
-        elif src == "geo-lampes":
-            sel.update(titre=f"💡 Lampadaire estimé — {p.get('lib')}",
-                       detail=f"{fmt(p.get('w'), ' W', 0)} estimés · côté {p.get('cote')} · pic {fmt(p.get('pic'), ' lx', 0)}")
-        elif src == "geo-points":
-            sel.update(titre="Point de mesure", detail=f"{fmt(p.get('E'), ' lx')} · sens {p.get('s')} · {p.get('h')}")
         elif src == "geo-hex":
             sel.update(titre="Hexagone de 2 m", detail=f"{fmt(p.get('E'), ' lx')} (sens 1 : {fmt(p.get('s1'), ' lx')}, "
                                                        f"sens 2 : {fmt(p.get('s2'), ' lx')}) · {p.get('np')} passage(s)")
@@ -1305,12 +1521,24 @@ def choisir_point(clic_tr, clic_hex, clic_pt, clic_lampe, cellule, cellule_q, ce
     return _selection_troncon(data, tid, extra)
 
 
+@app.callback(Output("selection", "data", allow_duplicate=True), Input("choix-rapport", "value"),
+              prevent_initial_call=True)
+def oublier_selection(dossier):
+    """Nouvelle tournée : le point sélectionné (carte, Street View) appartenait à l'ancienne."""
+    return None
+
+
+def streetview_vide():
+    return html.Div([html.I(className="bi bi-geo-alt fs-2 d-block mb-2"),
+                     "Sélectionnez un point ou un tronçon pour voir la rue."], className="sv-vide")
+
+
 @app.callback(Output("sv-cadre", "children"), Output("sv-legende", "children"),
               Output("sv-externe", "href"), Output("sv-externe", "className"),
               Input("selection", "data"), prevent_initial_call=True)
 def afficher_streetview(sel):
     if not sel:
-        return dash.no_update, dash.no_update, dash.no_update, dash.no_update
+        return streetview_vide(), None, None, "small text-info d-none"
     cadre = html.Iframe(src=embed_streetview(sel["lat"], sel["lon"], sel.get("cap", 0)), className="sv-iframe",
                         allow="fullscreen")
     legende = [html.Div(sel.get("titre"), className="fw-semibold"),
@@ -1354,6 +1582,230 @@ app.clientside_callback(
         return '';
     }""",
     Output("defilement", "children"), Input("selection", "data"), prevent_initial_call=True)
+
+
+# ------------------------------------------------------------------ CALLBACKS : VUES PAR RÔLE
+PAGES = ("operateur", "analyste", "affaires", "doc")
+
+
+# changement de vue dans le navigateur (instantané) ; une carte Leaflet créée dans une page masquée a une taille
+# nulle : une fois la page affichée, on lui redonne sa taille sans déplacer la vue (opérateur : cadrage de la trace)
+app.clientside_callback(
+    """function(page) {
+        page = page || 'analyste';
+        const pages = ['operateur', 'analyste', 'affaires', 'doc'];
+        const redimensionner = (essai) => {
+            const m = page === 'operateur' ? window.getysCarteOperateur : page === 'analyste' ? window.getysCarte : null;
+            if (!m) return;
+            const el = m.getContainer();
+            if (!el.offsetWidth && essai < 20) return setTimeout(() => redimensionner(essai + 1), 50);
+            const c = m.getCenter(), z = m.getZoom();
+            m.invalidateSize(false);
+            m.setView(c, z, {animate: false});
+        };
+        setTimeout(() => redimensionner(0), 30);
+        return pages.map(p => ({display: p === page ? 'block' : 'none'}));
+    }""",
+    *[Output(f"page-{p}", "style") for p in PAGES], Input("page", "value"))
+
+
+# ------------------------------------------------------------------ CALLBACKS : SDAL (fichier)
+@app.callback(Output("sdal-rues", "data"), Output("sdal-message", "children"),
+              *[Output(f"sdal-{c}", "value") for c in T.CLASSES],
+              Input("sdal-upload", "contents"), Input({"type": "sdal-retirer", "k": ALL}, "n_clicks"),
+              State("sdal-upload", "filename"), State("sdal-rues", "data"), prevent_initial_call=True)
+def importer_sdal(contenu, retirer, nom, rues):
+    rien = [dash.no_update] * len(T.CLASSES)
+    if isinstance(ctx.triggered_id, dict):                   # « Retirer les seuils par rue »
+        if not ctx.triggered or not ctx.triggered[0]["value"]:
+            return dash.no_update, dash.no_update, *rien
+        return {}, html.Span("Seuils par rue retirés.", className="text-muted"), *rien
+    if not contenu:
+        return dash.no_update, dash.no_update, *rien
+    try:
+        res = SF.lire(contenu, T.CLASSES)
+    except (ValueError, UnicodeDecodeError) as ex:
+        return dash.no_update, html.Span(f"{nom} : {ex}", className="text-danger"), *rien
+    if res["rues"]:
+        msg = html.Span([html.I(className="bi bi-check-circle me-1"), f"{nom} : {res['message']} ",
+                         html.A("Retirer", id={"type": "sdal-retirer", "k": 0}, href="#", className="ms-1")],
+                        className="text-success")
+        return res["rues"], msg, *rien
+    valeurs = [res["types"].get(c, dash.no_update) for c in T.CLASSES]
+    return dash.no_update, html.Span([html.I(className="bi bi-check-circle me-1"), f"{nom} : {res['message']}"],
+                                     className="text-success"), *valeurs
+
+
+# ------------------------------------------------------------------ CALLBACKS : OPÉRATEUR
+def tdms_du_rapport(dossier):
+    """Nom du .tdms dont est issu un rapport (resume.json -> meta.fichier_tdms)."""
+    if not dossier or not (Path(dossier) / "resume.json").exists():
+        return None
+    nom = charger(dossier)["resume"].get("meta", {}).get("fichier_tdms")
+    return Path(nom).name if nom else None
+
+
+@app.callback(Output("op-fichier", "data"), Output("op-nom", "children"), Output("op-etat", "children"),
+              Input("choix-rapport", "value"))
+def fichier_operateur(dossier):
+    """Le .tdms de la vue Opérateur est celui de la tournée choisie en haut (liste ou « Nouvelle tournée »).
+    Jamais de repli sur un autre fichier : s'il manque, la vue le dit et reste vide."""
+    voulu = tdms_du_rapport(dossier)
+    if voulu and OP.chemin_tdms(voulu) is not None:
+        return voulu, voulu, None
+    msg = dbc.Alert(f"Le fichier {voulu} de la tournée choisie n'est pas disponible (tdms_recus/) : rechargez-le avec "
+                    "« Nouvelle tournée » pour voir sa trace brute.", color="warning", className="m-2 py-2") \
+        if voulu else None
+    return None, "–", msg
+
+
+@app.callback(Output("op-trace-url", "data"), Output("op-controles", "children"),
+              Output("op-carte", "viewport"), Output("op-notes", "value"), Input("op-fichier", "data"))
+def afficher_brut(nom):
+    if not nom:
+        return None, html.P("Aucun fichier .tdms pour cette tournée.",
+                            className="text-muted small"), dash.no_update, ""
+    f = OP.chemin_tdms(nom)
+    try:
+        brut = OP.lire_brut(f)
+    except Exception as ex:                                   # fichier incomplet ou d'un autre format
+        return None, dbc.Alert(f"Lecture impossible : {ex}", color="danger", className="py-2"), dash.no_update, ""
+    d = brut["points"]
+    lignes = [html.Div(className="controle", children=[
+        html.I(className="bi bi-check-circle-fill text-success" if c["ok"] else "bi bi-exclamation-triangle-fill text-warning"),
+        html.Div([html.Div(c["titre"], className="fw-semibold"), html.Div(c["detail"], className="small text-muted")])])
+        for c in brut["controles"]]
+    lignes.append(html.Div(f"Lecture du fichier : {brut['duree_lecture']} s · {len(d)} positions GPS × 3 capteurs",
+                           className="small text-muted mt-2"))
+    lat0 = float(d["lat"].mean())                            # zoom qui fait tenir la trace (carte ≈ 900 × 640 px)
+    dx = (d["lon"].max() - d["lon"].min()) * 111320 * math.cos(math.radians(lat0))
+    dy = (d["lat"].max() - d["lat"].min()) * 110540
+    mpp = max(dx / 900, dy / CARTE_H, 0.5) * 1.15
+    zoom = int(np.clip(math.floor(math.log2(40075016.686 * math.cos(math.radians(lat0)) / (mpp * 256))), 10, 18))
+    vue = {"center": [(d["lat"].min() + d["lat"].max()) / 2, (d["lon"].min() + d["lon"].max()) / 2], "zoom": zoom}
+    return f"/operateur/{quote(Path(nom).stem)}.json?v={int(f.stat().st_mtime)}", lignes, vue, \
+        OP.lire_notes(nom).get("notes", "")
+
+
+# la trace (3 × 60 000 points) est dessinée par le navigateur sur un canevas (assets/carte_leaflet.js)
+app.clientside_callback(
+    """function(url) { window.getys.traceBrute(url); return ''; }""",
+    Output("op-trace-dessin", "children"), Input("op-trace-url", "data"))
+
+
+@app.callback(Output("op-fonds", "children"), Output("op-cadre", "className"), Input("fond", "value"))
+def fond_operateur(fond):
+    """Mêmes fonds que la carte de l'analyste : vectoriel en clair / sombre (assets/carte_leaflet.js, nets à tous
+    les zooms), images Esri haute résolution en satellite."""
+    return tuiles(fond, "op-tuiles"), f"carte-leaflet fond-{fond}"
+
+
+@app.callback(Output("op-form", "style"), Output("op-coord", "children"), Output("op-attente", "data"),
+              Input("op-carte", "clickData"), State("op-mode-note", "value"), prevent_initial_call=True)
+def placer_point(clic, mode):
+    """Mode « Ajouter un point au clic » : le clic sur la carte prépare un point à commenter."""
+    if "on" not in (mode or []) or not clic or "latlng" not in clic:
+        return dash.no_update, dash.no_update, dash.no_update
+    lat, lon = clic["latlng"]["lat"], clic["latlng"]["lng"]
+    return {"display": "block"}, f"Nouveau point : {lat:.5f}, {lon:.5f}", [lat, lon]
+
+
+def _marqueurs(notes, attente=None):
+    calques = [dl.CircleMarker(center=[p["lat"], p["lon"]], radius=9, color="#111", weight=1.5, fillColor="#F2A900",
+                               fillOpacity=0.95, children=dl.Tooltip(f"{i}. {p.get('texte', '')}"))
+               for i, p in enumerate(notes.get("points", []), 1)]
+    if attente:
+        calques.append(dl.CircleMarker(center=attente, radius=9, color="#111", weight=1.5, dashArray="3",
+                                       fillColor="#ffffff", fillOpacity=0.8))
+    return calques
+
+
+def _liste(notes):
+    if not notes.get("points"):
+        return html.Div("Aucun point pour le moment.", className="small text-muted mb-1")
+    return html.Div(className="liste-points", children=[
+        html.Div(className="point-note", children=[
+            html.Span(f"{i}", className="deficit-rang"),
+            html.Div([html.Div(p.get("texte") or "(sans commentaire)"),
+                      html.Div(f"{p['lat']:.5f}, {p['lon']:.5f} · {p.get('date', '')}", className="small text-muted")],
+                     className="flex-grow-1"),
+            html.Button(html.I(className="bi bi-trash"), id={"type": "op-suppr", "k": i - 1},
+                        className="btn btn-sm btn-link text-danger p-0", title="Supprimer")])
+        for i, p in enumerate(notes["points"], 1)])
+
+
+@app.callback(Output("op-marqueurs", "children"), Output("op-liste", "children"), Output("op-texte", "value"),
+              Output("op-form", "style", allow_duplicate=True),
+              Input("op-fichier", "data"), Input("op-ajouter", "n_clicks"), Input({"type": "op-suppr", "k": ALL}, "n_clicks"),
+              Input("op-attente", "data"),
+              State("op-texte", "value"), prevent_initial_call="initial_duplicate")
+def points_operateur(nom, ajouter, suppr, attente, texte):
+    if not nom:
+        return [], _liste({}), dash.no_update, dash.no_update
+    notes = OP.lire_notes(nom)
+    src = ctx.triggered_id
+    if src == "op-ajouter" and ajouter and attente:
+        notes["points"].append({"lat": attente[0], "lon": attente[1], "texte": (texte or "").strip(),
+                                "date": pd.Timestamp.now(tz="Europe/Paris").strftime("%d/%m/%Y %H:%M")})
+        OP.ecrire_notes(nom, notes)
+        return _marqueurs(notes), _liste(notes), "", {"display": "none"}
+    if isinstance(src, dict) and ctx.triggered and ctx.triggered[0]["value"]:
+        if 0 <= src["k"] < len(notes["points"]):
+            notes["points"].pop(src["k"])
+            OP.ecrire_notes(nom, notes)
+        return _marqueurs(notes), _liste(notes), dash.no_update, dash.no_update
+    if src == "op-attente":                                   # point en attente de commentaire
+        return _marqueurs(notes, attente), _liste(notes), dash.no_update, dash.no_update
+    return _marqueurs(notes), _liste(notes), dash.no_update, {"display": "none"}
+
+
+@app.callback(Output("op-notes-etat", "children"), Input("op-enregistrer", "n_clicks"),
+              State("op-fichier", "data"), State("op-notes", "value"), prevent_initial_call=True)
+def enregistrer_notes(n, nom, texte):
+    if not nom:
+        return "Aucun fichier pour cette tournée."
+    notes = OP.lire_notes(nom)
+    notes["notes"] = texte or ""
+    OP.ecrire_notes(nom, notes)
+    return f"Enregistré à {pd.Timestamp.now(tz='Europe/Paris').strftime('%H:%M')}."
+
+
+# ------------------------------------------------------------------ CALLBACKS : CHARGÉ D'AFFAIRES
+@app.callback(Output("ra-sections", "value"), Input("ra-defaut", "n_clicks"), prevent_initial_call=True)
+def sections_par_defaut(n):
+    return RA.DEFAUT
+
+
+def _rapport_html(dossier, sections, titre, destinataire, auteur, commentaire, valeurs):
+    data = charger(dossier)
+    tr = avec_seuils(data["troncons"], sdal_de(valeurs), rues_de(valeurs)) if data["troncons"] is not None else None
+    notes = OP.notes_du_rapport(data["resume"].get("meta", {}).get("fichier_tdms"))
+    figures = {"lampes": types_lampes(data) if data["resume"].get("types") else None,
+               "chrono": chronologie(data) if data["resume"].get("ts") else None}
+    return RA.construire(sections or [], {"titre": titre, "destinataire": destinataire, "auteur": auteur,
+                                          "commentaire": commentaire}, data, tr, T.CLASSES, figures, notes)
+
+
+RA_STATES = [State("ra-sections", "value"), State("ra-titre", "value"), State("ra-destinataire", "value"),
+             State("ra-auteur", "value"), State("ra-commentaire", "value"),
+             *[State(f"sdal-{c}", "value") for c in T.CLASSES], State("sdal-rues", "data")]
+
+
+@app.callback(Output("ra-cadre", "srcDoc"), Input("ra-apercu", "n_clicks"), Input("page", "value"),
+              Input("choix-rapport", "value"), *RA_STATES)
+def apercu_rapport(n, page, dossier, sections, titre, destinataire, auteur, commentaire, *valeurs):
+    if page != "affaires" or not dossier:
+        return dash.no_update
+    return _rapport_html(dossier, sections, titre, destinataire, auteur, commentaire, valeurs)
+
+
+@app.callback(Output("ra-download", "data"), Input("ra-telecharger", "n_clicks"), State("choix-rapport", "value"),
+              *RA_STATES, prevent_initial_call=True)
+def telecharger_rapport(n, dossier, sections, titre, destinataire, auteur, commentaire, *valeurs):
+    if not dossier:
+        return dash.no_update
+    page = _rapport_html(dossier, sections, titre, destinataire, auteur, commentaire, valeurs)
+    return dict(content=page, filename=f"rapport_{Path(dossier).name}.html", type="text/html")
 
 
 if __name__ == "__main__":

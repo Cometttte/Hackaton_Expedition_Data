@@ -9,7 +9,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # analyse GETYS (racine du dépôt) + dashboard
-COPY getys_analyse.py getys_rapport.py rapport_template.html carte_template.html ./
+COPY getys_analyse.py getys_rapport.py rapport_template.html carte_template.html EXPLICATION_DU_CODE.md ./
 COPY dashboard ./dashboard
 
 RUN mkdir -p rapports tdms_recus

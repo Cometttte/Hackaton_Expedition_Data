@@ -348,6 +348,9 @@ PAGE = """<!doctype html>
  #legende-lampes{display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;margin-top:8px;font-size:11.5px;color:#c9d1d9}
  #legende-lampes[hidden]{display:none} #legende-lampes i{display:inline-block;width:8px;height:8px;border-radius:50%;
    border:1.5px solid #fff;margin-right:5px}
+ .export{margin-top:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:#9da7b3;font-size:11.5px}
+ .export a{color:#e6edf3;text-decoration:none;border:1px solid rgba(255,255,255,.16);border-radius:6px;padding:3px 8px;
+   background:rgba(255,255,255,.04)} .export a:hover{border-color:#6cc08b;color:#fff}
  #valeur{position:absolute;pointer-events:none;padding:5px 9px;border-radius:7px;background:rgba(13,17,23,.9);
    color:#e6edf3;font-size:12px;border:1px solid rgba(255,255,255,.1);transform:translate(12px,-50%);display:none;
    white-space:nowrap} #valeur b{font-size:14px}
@@ -355,6 +358,9 @@ PAGE = """<!doctype html>
 <div id="panneau"><h1>Éclairement</h1><div class="sous">__TITRE__<br>__PARAMS__</div>
  <div class="rampe"></div><div class="graduations"><span>0</span><span>10</span><span>20</span><span>30</span>
  <span>40</span><span>50+ lx</span></div>
+ <div class="export">Exporter en GeoJSON :
+  <a download href="__EXPORT_ZONES__" title="Surface lissée : un MultiPolygon par classe de lux">Zones par classe</a>
+  <a download href="__EXPORT_CELLULES__" title="Centres des cellules de 2 m : moyenne et valeur de chaque sens">Cellules de 2 m</a></div>
  <div class="ligne">Vue <div class="seg" id="vue"><button class="on" data-vue="lisse">Lissée</button>
   <button data-vue="capteurs">3 capteurs</button></div></div>
  <div class="note" id="note">__NOTE_LISSE__</div>
@@ -375,10 +381,10 @@ const carte = new maplibregl.Map({container: "carte", maxZoom: 21, attributionCo
       satellite: {type: "raster", tiles: [ESRI("World_Imagery")], tileSize: 256, maxzoom: 19,
                   attribution: "Imagerie © Esri, Maxar, Earthstar Geographics"},
       noms: {type: "raster", tiles: [ESRI("Reference/World_Boundaries_and_Places")], tileSize: 256, maxzoom: 19},
-      clair: {type: "raster", tiles: ["https://a.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png"], tileSize: 256,
-              attribution: "© OpenStreetMap © CARTO"},
-      sombre: {type: "raster", tiles: ["https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png"], tileSize: 256,
-               attribution: "© OpenStreetMap © CARTO"},
+      clair: {type: "raster", tiles: [ESRI("Canvas/World_Light_Gray_Base")], tileSize: 256,
+              attribution: "Esri, HERE, Garmin, © contributeurs OpenStreetMap", maxzoom: 16},
+      sombre: {type: "raster", tiles: [ESRI("Canvas/World_Dark_Gray_Base")], tileSize: 256,
+               attribution: "Esri, HERE, Garmin, © contributeurs OpenStreetMap", maxzoom: 16},
       eclairement: {type: "image", url: IMG, coordinates: COINS}},
     layers: [
       {id: "satellite", type: "raster", source: "satellite", paint: {"raster-saturation": -0.35, "raster-brightness-max": 0.7}},
@@ -456,10 +462,8 @@ function choisirFond(fond) {
 document.querySelectorAll("#fond button").forEach(b => b.onclick = () => choisirFond(b.dataset.fond));
 // intégrée au dashboard : le fond suit celui du dashboard (#fond=…, changé sans recharger la page)
 const fondAdresse = () => (location.hash.match(/fond=(\\w+)/) || [])[1];
-if (fondAdresse()) {
-  document.getElementById("ligne-fond").style.display = "none";
-  choisirFond(fondAdresse());
-}
+if (/integre=1/.test(location.hash)) document.getElementById("ligne-fond").style.display = "none";
+if (fondAdresse()) choisirFond(fondAdresse());
 window.addEventListener("hashchange", () => choisirFond(fondAdresse()));
 
 // valeur au survol : grille d'octets (0,2 lx par pas) alignée sur les pixels de l'image, compressée (zlib)
@@ -505,7 +509,9 @@ carte.on("mouseout", () => { bulle.style.display = "none"; });
 """
 
 
-def page(image_png: bytes, codes, cadre, capteurs, lampes, titre, params):
+def page(image_png: bytes, codes, cadre, capteurs, lampes, titre, params,
+         exports=("heatmap_flux.geojson", "heatmap_flux_points.geojson")):
+    """exports : liens (relatifs à la page) des deux GeoJSON proposés dans la légende."""
     grille = {k: cadre[k] for k in ("x0", "y1", "pas", "w", "h")}
     grille.update(lux=LUX_PAR_CODE, donnees=base64.b64encode(zlib.compress(codes.tobytes(), 9)).decode())
     degrade = ",".join(f"rgb{c} {100 * v / LUX_MAX:g}%" for v, c in STOPS)
@@ -516,6 +522,7 @@ def page(image_png: bytes, codes, cadre, capteurs, lampes, titre, params):
             .replace("__COUL_TYPES__", json.dumps(COUL_TYPES)).replace("__NOMS_TYPES__", json.dumps(NOMS_TYPES))
             .replace("__TITRE__", titre).replace("__PARAMS__", params).replace("__DEGRADE__", degrade)
             .replace("__COINS__", json.dumps(cadre["coins"])).replace("__GRILLE__", json.dumps(grille))
+            .replace("__EXPORT_ZONES__", exports[0]).replace("__EXPORT_CELLULES__", exports[1])
             .replace("__IMAGE__", base64.b64encode(image_png).decode()))
 
 
@@ -531,7 +538,8 @@ def page_heatmap(p, m_capteurs, lampes, titre, brut=False, res=RES_M, sigma=SIGM
     image_png = png(rgba)
     params = (f"Grille {res:g} m · lissage σ = {sigma:g} m · ≤ {rayon:g} m des mesures"
               + (" · signal brut" if brut else ""))
-    return (page(image_png, codes, cadre, points_capteurs(m_capteurs), lampes, titre, params),
+    return (page(image_png, codes, cadre, points_capteurs(m_capteurs), lampes, titre, params,
+                 tuple(f"{n}{'_brut' if brut else ''}.geojson" for n in ("heatmap_flux", "heatmap_flux_points"))),
             image_png, cadre, (E, x0, y0))
 
 

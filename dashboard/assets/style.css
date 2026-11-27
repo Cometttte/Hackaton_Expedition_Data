@@ -183,7 +183,9 @@ a { color: var(--vert-texte); }
   color: #9A6700; border: 1px solid rgba(242, 169, 0, 0.5); }
 
 /* --- carte Leaflet */
-.carte-leaflet { position: relative; }
+/* isolation : les plans internes de la carte (calques Leaflet 400, boutons de zoom 1000, légende 500) restent dans la
+   carte. Les listes déroulantes de la barre d'outils (plan 500) passent ainsi toujours au-dessus. */
+.carte-leaflet { position: relative; isolation: isolate; z-index: 0; }
 .carte-leaflet .leaflet-container { background: #E8F0EA; font-family: Roboto, Arial, sans-serif; }
 .carte-leaflet.fond-sombre .leaflet-container { background: #161616; }   /* teinte des tuiles OSM inversées */
 .carte-leaflet.fond-satellite .leaflet-container { background: #1f2a1c; }
@@ -245,3 +247,126 @@ a { color: var(--vert-texte); }
 .carte-type-chiffres > div { display: flex; flex-direction: column; font-size: 0.72rem; color: var(--texte-2); }
 .carte-type-chiffres b { font-size: 0.95rem; color: var(--texte); font-variant-numeric: tabular-nums; }
 .carte-type-chiffres .text-danger b { color: var(--orange); }
+
+/* ======================================================================================================
+   Mode sombre (bouton de l'en-tête : <html data-theme="sombre" data-bs-theme="dark">, mémorisé)
+   Même charte GETYS, verts éclaircis pour rester lisibles sur fond sombre.
+   ====================================================================================================== */
+[data-theme="sombre"] {
+  --fond: #0E1511;
+  --surface: #151E19;
+  --surface-2: #1B2620;
+  --bord: #2A3A31;
+  --texte: #DDE7E0;
+  --texte-2: #93A59A;
+  --titre: #8FD3A8;
+  --vert-texte: #6CC08B;
+  --piste: #24332A;
+
+  --Dash-Fill-Interactive-Strong: #4FB377;
+  --Dash-Fill-Interactive-Weak: rgba(79, 179, 119, 0.12);
+  --Dash-Fill-Inverse-Strong: #151E19;
+  --Dash-Fill-Disabled: rgba(255, 255, 255, 0.06);
+  --Dash-Fill-Primary-Hover: rgba(143, 211, 168, 0.08);
+  --Dash-Fill-Primary-Active: rgba(143, 211, 168, 0.14);
+  --Dash-Text-Strong: #8FD3A8;
+  --Dash-Text-Primary: #DDE7E0;
+  --Dash-Text-Weak: #93A59A;
+  --Dash-Text-Disabled: #5E6E64;
+  --Dash-Stroke-Strong: #3A4D41;
+  --Dash-Stroke-Weak: #2A3A31;
+  color-scheme: dark;
+}
+[data-theme="sombre"] body { background: var(--fond); color: var(--texte); }
+
+/* titres et libellés verts : vert clair */
+[data-theme="sombre"] :is(h1, h2, h3, h4, h5, h6, .h6, .titre, .bloc-titre, .deficit-nom, .carte-type-nom,
+  .leg-titre, .voile-titre, .sv-legende .fw-semibold, .leaflet-tooltip b, .kpi-valeur.text-light) { color: var(--titre); }
+[data-theme="sombre"] .sous-titre, [data-theme="sombre"] .bloc-titre i, [data-theme="sombre"] .contexte i { color: var(--vert-texte); }
+[data-theme="sombre"] a, [data-theme="sombre"] .text-info, [data-theme="sombre"] .text-success { color: var(--vert-texte) !important; }
+[data-theme="sombre"] .text-warning { color: #F2B640 !important; }
+
+/* en-tête et boutons */
+[data-theme="sombre"] .entete { background: var(--surface); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35); }
+[data-theme="sombre"] .entete .btn-outline-light { background: var(--surface); color: var(--titre); border-color: #3E9C61; }
+[data-theme="sombre"] .entete .btn-outline-light:hover { background: #3E9C61; color: #fff; }
+[data-theme="sombre"] .choix-rapport.dash-dropdown { background: var(--surface-2); }
+[data-theme="sombre"] .logo-getys, [data-theme="sombre"] .logo-entreprise img { background: #fff; border-radius: 6px; padding: 2px 4px; }
+.bouton-theme { width: 34px; padding-left: 0; padding-right: 0; }
+
+/* blocs, KPI, barres */
+[data-theme="sombre"] :is(.kpi, .bloc, .bloc > .card-header, .carte-type, .ligne-deficit, .modal-content) {
+  background: var(--surface); border-color: var(--bord); box-shadow: none; }
+[data-theme="sombre"] .bloc > .card-footer { background: var(--surface-2); }
+[data-theme="sombre"] :is(.kpi-barre, .deficit-barre) { background: var(--piste); }
+[data-theme="sombre"] .badge-type { background: var(--piste); color: var(--titre); }
+[data-theme="sombre"] .card-header-tabs .nav-link.active { color: var(--titre); }
+[data-theme="sombre"] .card-header-tabs .nav-link:hover { color: var(--titre); }
+
+/* contrôles */
+[data-theme="sombre"] .segmente .btn { background: var(--surface-2); border-color: var(--bord); color: var(--texte-2); }
+[data-theme="sombre"] .segmente .btn:hover { color: var(--titre); background: var(--piste); }
+[data-theme="sombre"] .segmente .btn.active, [data-theme="sombre"] .segmente .btn-check:checked + .btn {
+  background: #2E7D52; border-color: #2E7D52; color: #fff; }
+[data-theme="sombre"] .form-control { background: var(--surface-2); border-color: var(--bord); color: var(--texte); }
+[data-theme="sombre"] .input-group-text { background: var(--piste); border-color: var(--bord); color: var(--texte-2); }
+
+/* tableaux et graphiques Plotly (couleurs posées en ligne par Plotly : surchargées ici) */
+[data-theme="sombre"] .dash-spreadsheet-inner td { color: var(--texte); }
+[data-theme="sombre"] .js-plotly-plot .main-svg text { fill: var(--texte-2) !important; }
+[data-theme="sombre"] .js-plotly-plot .main-svg .gtitle, [data-theme="sombre"] .js-plotly-plot .main-svg .legendtext { fill: var(--texte) !important; }
+[data-theme="sombre"] .js-plotly-plot :is(.gridlayer path, .zerolinelayer path) { stroke: var(--bord) !important; }
+
+/* carte : légende, bulles, Street View */
+[data-theme="sombre"] .legende-carte { background: rgba(21, 30, 25, 0.94); border-color: var(--bord); color: var(--texte);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4); }
+[data-theme="sombre"] .legende-carte .pastille.rond { border-color: #DDE7E0; }
+[data-theme="sombre"] .leaflet-tooltip { background: var(--surface); color: var(--texte); border-color: var(--bord);
+  border-left-color: #4FB377; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45); }
+[data-theme="sombre"] .leaflet-bar a { background: var(--surface); color: var(--titre); border-color: var(--bord); }
+[data-theme="sombre"] .leaflet-control-attribution { background: rgba(21, 30, 25, 0.8) !important; color: var(--texte-2); }
+[data-theme="sombre"] .leaflet-control-scale-line { background: rgba(21, 30, 25, 0.8); color: var(--texte); border-color: var(--texte-2); }
+[data-theme="sombre"] .sv-cadre { background: var(--surface-2); }
+[data-theme="sombre"] .bandeau-lissage { background: rgba(79, 179, 119, 0.1); color: var(--vert-texte); }
+
+/* voiles de chargement */
+[data-theme="sombre"] .voile { background: rgba(14, 21, 17, 0.75); }
+[data-theme="sombre"] .voile-boite { background: var(--surface); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
+[data-theme="sombre"] .voile-anneau { border-color: var(--piste); border-top-color: var(--lime); border-right-color: var(--vert); }
+
+/* menu « Exporter en GeoJSON » (vue Heatmap) */
+.menu-export .btn { border-color: var(--vert); color: var(--vert-fonce); background: var(--surface); font-size: 0.8rem; }
+.menu-export .btn:hover, .menu-export .btn.show { background: var(--vert); border-color: var(--vert); color: #FFFFFF; }
+.menu-export .dropdown-menu { z-index: 1200; border-color: var(--bord); background: var(--surface); }
+.menu-export .dropdown-item { white-space: normal; min-width: 260px; }
+[data-theme="sombre"] .menu-export .btn { color: var(--titre); }
+
+/* --- navigation entre les vues (rôles) */
+.barre-pages { background: var(--surface); border-bottom: 1px solid var(--bord); padding: 8px 8px; }
+.barre-pages .pages .btn { font-size: 0.88rem; padding: 5px 16px; }
+[data-theme="sombre"] .barre-pages { background: var(--surface); }
+
+/* --- vue Opérateur */
+.controle { display: flex; gap: 10px; align-items: flex-start; padding: 6px 0; border-bottom: 1px solid var(--bord); }
+.controle:last-of-type { border-bottom: none; }
+.controle > i { margin-top: 2px; }
+.liste-points { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; margin-bottom: 6px; }
+.point-note { display: flex; gap: 10px; align-items: flex-start; font-size: 0.86rem; padding: 6px 8px;
+  border: 1px solid var(--bord); border-radius: 6px; background: var(--surface); }
+.point-note .deficit-rang { background: #F2A900; color: #111; flex-shrink: 0; }
+.sdal-upload { border: 1.5px dashed var(--bord); border-radius: 6px; padding: 7px 10px; text-align: center;
+  cursor: pointer; font-size: 0.85rem; color: var(--vert-texte); }
+.sdal-upload:hover { border-color: var(--vert); }
+
+/* --- vue Chargé d'affaires */
+.cadre-rapport { width: 100%; height: 1000px; border: 0; background: #fff; display: block; }
+
+/* --- onglet Doc */
+.doc .bloc table { width: 100%; font-size: 0.86rem; border-collapse: collapse; }
+.doc .bloc th, .doc .bloc td { border-bottom: 1px solid var(--bord); padding: 5px 8px; vertical-align: top; }
+.doc .bloc h3 { font-size: 1rem; margin-top: 14px; }
+.doc .bloc li { margin-bottom: 4px; font-size: 0.9rem; }
+.doc summary { cursor: pointer; color: var(--vert-texte); font-weight: 600; margin-bottom: 8px; }
+/* Leaflet 1.9 additionne les couleurs des tuiles (mix-blend-mode: plus-lighter) : avec le demi-pixel de
+   chevauchement ci-dessus, chaque joint ressortait en quadrillage clair (fond satellite). Dessin normal. */
+.carte-leaflet .leaflet-container img.leaflet-tile { mix-blend-mode: normal !important; }
