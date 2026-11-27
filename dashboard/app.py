@@ -6,10 +6,12 @@ Trois lectures des mesures (cf. cahier des charges GETYS) :
     getys_spatialisation.py), multi-passages, même règle par sens
   * Points chauds / froids : valeur moyenne autour de chaque point (méthode de carte.html, getys_rapport.py),
     rayon fixe en mètres quel que soit le zoom
+  * Heatmap : la page de heatmap_flux.py (dégradé lissé ou 3 capteurs, lampadaires estimés), intégrée telle quelle
 Carte : Leaflet (dash-leaflet), comme carte.html. Les données de chaque calque sont servies à part (gzip, cache
 navigateur) ; couleurs et seuils SDAL sont appliqués dans le navigateur (assets/carte_leaflet.js).
 La conformité (SDAL : un seuil d'éclairement moyen par type de voie) ne s'applique qu'aux tronçons.
-Chaque vue peut être affichée avant ou après le lissage du bruit (colonne E_brut de mesures_pas2m.csv).
+Conformité SDAL, comparaison avant / après lissage du bruit (colonne E_brut de mesures_pas2m.csv) et couches
+(lampadaires, valeurs aberrantes retirées) : vue Tronçons seulement. Le fond vaut pour toutes les vues.
 """
 import base64
 import gzip
@@ -33,6 +35,7 @@ from flask import Response, abort, request, send_from_directory
 from pyproj import Transformer
 from scipy.spatial import cKDTree
 
+import heatmap_flux as HF
 import hexagones as H
 import troncons as T
 
@@ -99,6 +102,8 @@ PALIERS = [0, 2, 5, 7.5, 10, 15, 20, 30, math.inf]
 COUL_PALIERS = [couleur_lux(m) for m in (1, 3.5, 6.25, 8.75, 12.5, 17.5, 25, 40)]
 COUL_TYPES = {"sodium": "#ff8a2a", "blanc_2700": "#ffd23f", "led_3000": "#3b9bff", "blanc_neutre": "#2ad4b0",
               "blanc_froid": "#b18cff", "inconnu": "#a0a8b5"}          # couleurs de carte.html
+# valeurs aberrantes retirées par le filtrage du bruit, couleur par motif
+COUL_MOTIFS = {"trop haut": "#ff3b3b", "trop bref": "#ff9f43", "variation à l'arrêt": "#c77dff"}
 
 TO93 = Transformer.from_crs(4326, 2154, always_xy=True)
 TO84 = Transformer.from_crs(2154, 4326, always_xy=True)
@@ -199,6 +204,35 @@ def _couche_gz(dossier, mtime, brut, couche):
     return gzip.compress(corps, 6), f'"{couche}-{int(mtime)}-{int(brut)}"'
 
 
+@app.server.route("/heatmap/<nom>/<variante>.html")
+def servir_heatmap(nom, variante):
+    """Page de heatmap_flux.py pour une tournée, générée au premier appel (quelques secondes) puis en cache."""
+    dossiers = {d.name: d for d in lister_rapports()}
+    if nom not in dossiers or variante not in ("lisse", "brut"):
+        abort(404)
+    d = dossiers[nom]
+    etag = f'"heatmap-{int(d.stat().st_mtime)}-{variante}"'
+    if request.headers.get("If-None-Match") == etag:
+        return Response(status=304)
+    rep = Response(_page_heatmap(str(d), d.stat().st_mtime, variante == "brut"), mimetype="text/html")
+    rep.headers.update({"ETag": etag, "Cache-Control": "public, max-age=86400, immutable"})
+    return rep
+
+
+@lru_cache(maxsize=2)
+def _page_heatmap(dossier, _mtime, brut):
+    """Mêmes entrées que le script : cellules de 2 m (moyenne des deux sens), mesures filtrées pour les
+    3 capteurs, lampadaires_estimes.geojson ; brut : surface recalculée sur E_brut (comme --brut)."""
+    data = charger(dossier, brut=brut)
+    html_page, *_ = HF.page_heatmap(HF.centres(data["hex"][1]), charger(dossier)["mesures"],
+                                     HF.lire_lampadaires(Path(dossier)), Path(dossier).name, brut=data["brut"])
+    return html_page.encode("utf-8")
+
+
+def url_heatmap(data):
+    return f"/heatmap/{quote(data['nom'])}/{'brut' if data['brut'] else 'lisse'}.html?v={data['version']}"
+
+
 def url_couche(data, couche):
     return (f"/geo/{quote(data['nom'])}/{'brut' if data['brut'] else 'lisse'}/{couche}.geojson"
             f"?v={data['version']}")
@@ -238,7 +272,7 @@ def charger(dossier, brut=False):
 @lru_cache(maxsize=4)
 def _charger(dossier, _mtime):
     d = Path(dossier)
-    sortie = {"resume": {}, "hex": None, "mesures": None, "supports": None, "luminaires": None,
+    sortie = {"resume": {}, "hex": None, "mesures": None, "supports": None, "luminaires": None, "aberrants": None,
               "troncons": None, "geoms": None, "erreur_troncons": None, "arbre_pts": None, "brut": False,
               "nom": d.name, "version": int(_mtime)}
     if (d / "resume.json").exists():
@@ -281,6 +315,7 @@ def _charger(dossier, _mtime):
                              "lat": f["geometry"]["coordinates"][1]}
                             for f in gj["features"] if f.get("geometry")])
         sortie["luminaires"] = lum if not lum.empty else None
+    sortie["aberrants"] = aberrants_gps(sortie["resume"], sortie["mesures"])
     return sortie
 
 
@@ -299,6 +334,51 @@ def _charger_brut(dossier, mtime):
         sortie["troncons"]["classe"] = tr["id"].map(cl).fillna(tr["classe"])
     sortie["hex"] = H.calculer(m)
     return sortie
+
+
+def _heure_dec(h):
+    """'23h31:30' -> 23.525 (heure locale décimale)."""
+    try:
+        hh, reste = str(h).split("h")
+        mm, ss = (reste.split(":") + ["0"])[:2]
+        return int(hh) + int(mm) / 60 + float(ss) / 3600
+    except ValueError:
+        return None
+
+
+def aberrants_gps(resume, m):
+    """Valeurs aberrantes retirées par le filtrage (resume.json -> qualite.aberrants), avec leur point GPS.
+    Si l'analyse fournit déjà lat / lon (8 champs), on les prend. Sinon on retrouve le point dans
+    mesures_pas2m.csv : parmi les mesures de la même seconde, celle dont le maximum brut (avant filtrage,
+    colonne Emax_brut) est le plus fort, c'est-à-dire là où le pic a été vu. Si le véhicule était arrêté
+    (pas de mesure à cette seconde), on prend la mesure la plus proche dans le temps (position approchée)."""
+    ab = (resume.get("qualite") or {}).get("aberrants") or []
+    if not ab:
+        return None
+    lignes = []
+    h_m = m["heure_locale"].to_numpy(float) if m is not None and "heure_locale" in m else None
+    emax = m["Emax_brut"].to_numpy(float) if m is not None and "Emax_brut" in m else None
+    for k, a in enumerate(ab):
+        heure, pic, duree, largeur, fond, motif = (list(a) + [None] * 6)[:6]
+        lat = lon = None
+        precision = "exacte (GPS de l'analyse)"
+        if len(a) >= 8 and a[6] is not None:
+            lat, lon = float(a[6]), float(a[7])
+        elif h_m is not None and _heure_dec(heure) is not None:
+            h = _heure_dec(heure)
+            dt = np.abs(((h_m - h + 12) % 24) - 12) * 3600            # écart en secondes (passage de minuit géré)
+            fen = np.where(dt <= 1.5)[0]
+            if len(fen):
+                i = fen[np.argmax(emax[fen])] if emax is not None else fen[np.argmin(dt[fen])]
+                precision = "à ± 5 m"
+            else:
+                i = int(np.argmin(dt))
+                precision = "approchée (véhicule à l'arrêt)"
+            lat, lon = float(m["lat"].iat[i]), float(m["lon"].iat[i])
+        lignes.append(dict(id=k, heure=heure, motif=motif, pic_lx=pic, fond_lx=fond, largeur_m=largeur, duree_s=duree,
+                           lat=lat, lon=lon, precision=precision))
+    df = pd.DataFrame(lignes)
+    return df if df["lat"].notna().any() else None
 
 
 def lien_streetview(lat, lon, cap=0):
@@ -392,6 +472,8 @@ def fn(nom):
 def legende(mode, couleur, couches, data):
     """Légende posée sur la carte (Leaflet n'en fournit pas)."""
     blocs = []
+    if mode == "heatmap":                          # la page de la heatmap a sa propre légende
+        return blocs
     if mode == "troncons" and couleur == "conformite":
         blocs.append(html.Div([html.Div([html.Span(className="pastille", style={"background": c}), t])
                                for t, c in (("Conforme", VERT), ("Non conforme", ROUGE),
@@ -411,7 +493,23 @@ def legende(mode, couleur, couches, data):
         blocs.append(html.Div([html.Div("Lampadaires estimés", className="leg-titre mt-1")] +
                               [html.Div([html.Span(className="pastille rond", style={"background": COUL_TYPES.get(t, "#fff")}),
                                          f"{t.replace('_', ' ')} ({n})"]) for t, n in lum["type"].value_counts().items()]))
+    ab = data["aberrants"] if data else None
+    if "ab" in (couches or []) and ab is not None:
+        blocs.append(html.Div([html.Div("Valeurs aberrantes retirées", className="leg-titre mt-1")] +
+                              [html.Div([html.Span(className="pastille rond", style={"background": COUL_MOTIFS.get(t, ROUGE)}),
+                                         f"{t} ({n})"]) for t, n in ab["motif"].value_counts().items()]))
     return blocs
+
+
+def marqueurs_aberrants(ab):
+    """Couche « Valeurs aberrantes » : un cercle par pic retiré (25 au plus), cliquable -> Street View."""
+    if ab is None:
+        return []
+    return [dl.CircleMarker(id={"type": "aberrant", "k": int(a.id)}, center=[a.lat, a.lon], radius=7, weight=2,
+                            color="#111", fillColor=COUL_MOTIFS.get(a.motif, ROUGE), fillOpacity=0.95,
+                            children=dl.Tooltip(f"Valeur aberrante retirée — {a.motif} · pic {fmt(a.pic_lx, ' lx', 0)} "
+                                                f"(fond {fmt(a.fond_lx, ' lx', 0)}) · {a.heure}"))
+            for a in ab.dropna(subset=["lat"]).itertuples()]
 
 
 VIDE = {"type": "FeatureCollection", "features": []}
@@ -484,6 +582,50 @@ def types_lampes(data):
                       title=dict(text=f"{fmt(k.get('n_lampadaires'), dec=0)} lampadaires estimés · "
                                       f"{fmt(k.get('puissance_tot_kw'), ' kW')} installés", font_size=13, x=0.01))
     return fig
+
+
+def bruit(data):
+    """Onglet « Bruit et valeurs aberrantes » : ce que le filtrage a corrigé et la liste des pics retirés,
+    chacun avec ses coordonnées GPS. Clic sur une ligne -> Street View à droite et carte centrée sur le point."""
+    q, k = data["resume"].get("qualite", {}), data["resume"].get("kpi", {})
+    ab = data["aberrants"]
+    cols = [("heure", "Heure"), ("motif", "Motif"), ("pic_lx", "Pic (lx)"), ("fond_lx", "Fond (lx)"),
+            ("largeur_m", "Largeur (m)"), ("gps", "Coordonnées GPS"), ("precision", "Position")]
+    # table toujours présente (vide et masquée s'il n'y a rien) : elle est une entrée de choisir_point
+    table_vide = html.Div(dash_table.DataTable(id="table-aberrants", data=[],
+                                               columns=[{"name": n, "id": c} for c, n in cols]), hidden=True)
+    if not q:
+        return html.Div([html.P("Pas d'informations sur le bruit dans ce rapport.", className="text-muted"),
+                         table_vide])
+    par_motif = ab["motif"].value_counts().to_dict() if ab is not None else {}
+    pastille = lambda c: html.Span(className="pastille rond", style={"background": c})  # noqa: E731
+    intro = html.Div([
+        html.P([html.B(f"{fmt(k.get('n_aberrants'), dec=0)} valeurs aberrantes retirées"),
+                f" ({fmt(q.get('part_aberrants'), ' %', 2)} des mesures), remplacées par interpolation. "
+                f"Autres corrections : {fmt(q.get('part_negatifs'), ' %', 1)} de mesures négatives ramenées à 0, "
+                f"{fmt(q.get('part_pics'), ' %', 2)} de parasites sur un seul capteur (filtre de Hampel), "
+                f"{fmt(k.get('n_pas_incoh'), dec=0)} passages incohérents écartés (phares, vitrine)."],
+               className="small mb-2"),
+        html.Div([html.Span([pastille(COUL_MOTIFS.get(m_, ROUGE)), f"{n} {m_}"], className="me-3 small")
+                  for m_, n in par_motif.items()], className="mb-2"),
+        html.P([html.I(className="bi bi-cursor me-1"),
+                "Cliquez une ligne : Street View s'ouvre à droite sur le lieu du pic et la carte s'y centre. "
+                "Activez « Valeurs aberrantes » au-dessus de la carte (vue Tronçons) pour les voir toutes."],
+               className="small text-muted mb-2"),
+    ])
+    if ab is None:
+        return html.Div([intro, table_vide])
+    t = ab.assign(gps=[f"{a:.5f}, {b:.5f}" if pd.notna(a) else "–" for a, b in zip(ab["lat"], ab["lon"])])
+    t = t.astype(object).where(t.notna(), None)
+    return html.Div([intro, dash_table.DataTable(
+        id="table-aberrants", data=t[[c for c, _ in cols] + ["id"]].to_dict("records"),
+        columns=[{"name": n, "id": c} for c, n in cols], sort_action="native", page_size=10, **STYLE_TABLE,
+        style_data_conditional=[
+            *[{"if": {"filter_query": f'{{motif}} = "{m_}"', "column_id": "motif"}, "color": c}
+              for m_, c in COUL_MOTIFS.items()],
+            {"if": {"column_id": "gps"}, "fontFamily": "monospace"},
+            {"if": {"state": "active"}, "backgroundColor": "rgba(62,156,97,0.12)", "border": "1px solid #3E9C61"}],
+    )])
 
 
 def chronologie(data):
@@ -609,7 +751,7 @@ def segmente(id_, valeur, options, titre=None):
                            labelCheckedClassName="active", options=options)
     if not titre:
         return radio
-    return html.Div([html.Span(titre, className="outil-titre"), radio], className="outil")
+    return html.Div([html.Span(titre, className="outil-titre"), radio], className="outil", id=f"outil-{id_}")
 
 
 upload_style = {"border": "1.5px dashed #3d444d", "borderRadius": "10px", "padding": "22px",
@@ -676,8 +818,10 @@ app.layout = html.Div(className="page", children=[
                     segmente("mode-carte", "troncons", [
                         {"label": [html.I(className="bi bi-bezier2 me-1"), "Tronçons"], "value": "troncons"},
                         {"label": [html.I(className="bi bi-hexagon me-1"), "Hexagones"], "value": "hex"},
-                        {"label": [html.I(className="bi bi-thermometer-half me-1"), "Points chauds / froids"],
-                         "value": "points"}], "Vue"),
+                        {"label": [html.I(className="bi bi-record-circle me-1"), "Points chauds / froids"],
+                         "value": "points"},
+                        {"label": [html.I(className="bi bi-thermometer-half me-1"), "Heatmap"],
+                         "value": "heatmap"}], "Vue"),
                     segmente("couleur-carte", "eclairement", [
                         {"label": "Éclairement", "value": "eclairement"},
                         {"label": "Conformité SDAL", "value": "conformite"}], "Couleur (tronçons)"),
@@ -692,7 +836,7 @@ app.layout = html.Div(className="page", children=[
                          "value": "satellite"}], "Fond"),
                     dbc.Checklist(id="couches", value=[], switch=True, className="small outil-couches",
                                   options=[{"label": "Lampadaires estimés", "value": "lum"},
-                                           {"label": "Supports suspects", "value": "sus"}]),
+                                           {"label": "Valeurs aberrantes", "value": "ab"}]),
                 ])),
                 html.Div(id="bandeau-lissage"),
                 dbc.CardBody(html.Div(id="cadre-carte", className="carte-leaflet fond-clair", children=[
@@ -706,10 +850,14 @@ app.layout = html.Div(className="page", children=[
                                dl.GeoJSON(id="geo-points", data=VIDE, pointToLayer=fn("pointChaud")),
                                dl.GeoJSON(id="geo-lampes", data=VIDE, pointToLayer=fn("lampe"),
                                           onEachFeature=fn("infoLampe")),
+                               dl.LayerGroup(id="groupe-aberrants"),
                                dl.LayerGroup(id="groupe-selection"),
                                dl.ScaleControl(position="bottomright", imperial=False),
                            ]),
                     html.Div(id="legende", className="legende-carte"),
+                    # vue Heatmap : page de heatmap_flux.py posée sur la carte (fond, vue, lampadaires intégrés)
+                    html.Iframe(id="carte-heatmap", className="carte-heatmap", style={"display": "none"},
+                                title="Heatmap de l'éclairement"),
                 ]), className="p-0"),
             ])),
             # --- Street View + SDAL
@@ -737,6 +885,7 @@ app.layout = html.Div(className="page", children=[
                     dbc.Tab(label="Lampadaires", tab_id="lampes"),
                     dbc.Tab(label="Chronologie", tab_id="chrono"),
                     dbc.Tab(label="Qualité des données", tab_id="qualite"),
+                    dbc.Tab(label="Bruit et valeurs aberrantes", tab_id="bruit"),
                 ])),
                 dbc.CardBody([
                     html.Div(id="tableau"),
@@ -744,6 +893,7 @@ app.layout = html.Div(className="page", children=[
                     html.Div(dcc.Graph(id="lampes", config={"displayModeBar": False}), id="p-lampes"),
                     html.Div(dcc.Graph(id="chrono", config={"displayModeBar": False}), id="p-chrono"),
                     html.Div(id="qualite"),
+                    html.Div(id="bruit"),
                 ]),
             ])),
         ]),
@@ -903,7 +1053,7 @@ app.clientside_callback(
 
 
 ONGLETS = {"troncons": "tableau", "distrib": "p-distrib", "lampes": "p-lampes", "chrono": "p-chrono",
-           "qualite": "qualite"}
+           "qualite": "qualite", "bruit": "bruit"}
 
 
 @app.callback(*[Output(p, "style") for p in ONGLETS.values()], Input("onglets", "active_tab"))
@@ -914,12 +1064,12 @@ def changer_onglet(onglet):
 # ------------------------------------------------------------------ CALLBACKS : AFFICHAGE
 @app.callback(Output("contexte", "children"), Output("kpis", "children"),
               Output("p-distrib", "children"), Output("lampes", "figure"), Output("chrono", "figure"),
-              Output("tableau", "children"), Output("qualite", "children"),
+              Output("tableau", "children"), Output("qualite", "children"), Output("bruit", "children"),
               Input("choix-rapport", "value"), *SDAL_INPUTS)
 def afficher(dossier, *valeurs):
     if not dossier:
         vide = carte_vide("Aucune tournée analysée — cliquez sur « Nouvelle tournée »", 360)
-        return None, [], None, vide, vide, None, None
+        return None, [], None, vide, vide, None, None, None
     sdal = sdal_de(valeurs)
     data = charger(dossier)
     meta = data["resume"].get("meta", {})
@@ -962,7 +1112,7 @@ def afficher(dossier, *valeurs):
                         f"{fmt(k.get('puissance_tot_kw'), ' kW')} installés", "info"))
 
     return ([contexte, alerte], kpis, vue_types(tr), types_lampes(data),
-            chronologie(data), tableau_troncons(tr), qualite(data, tr))
+            chronologie(data), tableau_troncons(tr), qualite(data, tr), bruit(data))
 
 
 # ------------------------------------------------------------------ CALLBACKS : CARTE (Leaflet)
@@ -977,7 +1127,7 @@ def afficher(dossier, *valeurs):
 def afficher_calques(dossier, mode, lissage):
     if not dossier:
         return None, VIDE, None, VIDE, None, VIDE, None
-    brut = lissage == "avant"
+    brut = lissage == "avant" and mode == "troncons"       # avant / après : vue Tronçons seulement
     data = charger(dossier, brut=brut)
     sortie = []
     for m, couche in (("troncons", "troncons"), ("hex", "hexagones"), ("points", "points")):
@@ -986,6 +1136,11 @@ def afficher_calques(dossier, mode, lissage):
     if mode == "troncons" and data["troncons"] is None:
         bandeau.append(html.Div("Filaire de voirie indisponible (réseau ?) : " + (data["erreur_troncons"] or ""),
                                 className="bandeau-lissage"))
+    if mode == "heatmap":
+        bandeau.append(html.Div([html.I(className="bi bi-thermometer-half me-2"),
+                                 "Heatmap : moyenne des deux sens, lissée (σ = 4 m), et lampadaires estimés. Vue lissée / "
+                                 "3 capteurs, lampadaires et opacité se règlent dans le panneau de la carte. Premier "
+                                 "affichage d'une tournée : quelques secondes."], className="bandeau-lissage"))
     if brut and not data["brut"]:
         bandeau.append(html.Div([html.I(className="bi bi-soundwave me-2"), "Ce rapport ne contient pas le signal "
                                  "brut (colonne E_brut) : relancez l'analyse pour l'obtenir."], className="bandeau-lissage"))
@@ -999,18 +1154,38 @@ def colorer_troncons(couleur, mode, *valeurs):
     return {"couleur": couleur if mode == "troncons" else "eclairement", "sdal": sdal_de(valeurs)}
 
 
-@app.callback(Output("geo-lampes", "url"), Output("geo-lampes", "data"),
-              Input("couches", "value"), Input("choix-rapport", "value"))
-def afficher_lampes(couches, dossier):
-    if dossier and "lum" in (couches or []):
-        return url_couche(charger(dossier), "lampadaires"), None
-    return None, VIDE
+@app.callback(Output("geo-lampes", "url"), Output("geo-lampes", "data"), Output("groupe-aberrants", "children"),
+              Input("couches", "value"), Input("choix-rapport", "value"), Input("mode-carte", "value"))
+def afficher_couches(couches, dossier, mode):
+    """Lampadaires estimés et valeurs aberrantes retirées : par-dessus la vue Tronçons seulement."""
+    couches = (couches or []) if dossier and mode == "troncons" else []
+    data = charger(dossier) if dossier else None
+    lampes = (url_couche(data, "lampadaires"), None) if "lum" in couches else (None, VIDE)
+    return (*lampes, marqueurs_aberrants(data["aberrants"]) if "ab" in couches else [])
+
+
+@app.callback(Output("carte-heatmap", "src"), Output("carte-heatmap", "style"),
+              Input("choix-rapport", "value"), Input("mode-carte", "value"), Input("fond", "value"))
+def afficher_heatmap(dossier, mode, fond):
+    """Vue Heatmap : page de heatmap_flux.py posée sur la carte. Seul le fond change -> seul le #fond= change,
+    la page n'est pas rechargée. Page générée au premier affichage seulement."""
+    if not dossier or mode != "heatmap":
+        return dash.no_update, {"display": "none"}
+    return f"{url_heatmap(charger(dossier))}#fond={fond}", {"display": "block"}
+
+
+@app.callback(Output("outil-couleur-carte", "style"), Output("outil-lissage", "style"), Output("couches", "style"),
+              Input("mode-carte", "value"))
+def montrer_outils(mode):
+    """Couleur (conformité SDAL), avant / après lissage et couches : vue Tronçons seulement."""
+    s = {} if mode == "troncons" else {"display": "none"}
+    return s, s, s
 
 
 @app.callback(Output("legende", "children"), Input("mode-carte", "value"), Input("couleur-carte", "value"),
               Input("couches", "value"), Input("choix-rapport", "value"))
 def afficher_legende(mode, couleur, couches, dossier):
-    return legende(mode, couleur if mode == "troncons" else "eclairement", couches,
+    return legende(mode, couleur if mode == "troncons" else "eclairement", couches if mode == "troncons" else [],
                    charger(dossier) if dossier else None)
 
 
@@ -1064,12 +1239,31 @@ def _selection_troncon(data, tid, titre_extra=None):
               Input("geo-troncons", "clickData"), Input("geo-hex", "clickData"), Input("geo-points", "clickData"),
               Input("geo-lampes", "clickData"),
               Input("table-troncons", "active_cell"), Input("table-qualite", "active_cell"),
+              Input("table-aberrants", "active_cell"), Input({"type": "aberrant", "k": ALL}, "n_clicks"),
               State("choix-rapport", "value"), prevent_initial_call=True)
-def choisir_point(clic_tr, clic_hex, clic_pt, clic_lampe, cellule, cellule_q, dossier):
+def choisir_point(clic_tr, clic_hex, clic_pt, clic_lampe, cellule, cellule_q, cellule_ab, clics_ab, dossier):
     if not dossier:
         return dash.no_update
     data = charger(dossier)
     src = ctx.triggered_id
+    # valeur aberrante retirée : ligne de l'onglet « Bruit et valeurs aberrantes » ou cercle de la carte
+    k_ab = None
+    if src == "table-aberrants" and cellule_ab:
+        k_ab = cellule_ab.get("row_id")
+    elif isinstance(src, dict) and src.get("type") == "aberrant" and ctx.triggered and ctx.triggered[0]["value"]:
+        k_ab = src["k"]
+    if src == "table-aberrants" or isinstance(src, dict):
+        ab = data["aberrants"]
+        if k_ab is None or ab is None or k_ab not in set(ab["id"]):
+            return dash.no_update
+        a = ab.set_index("id").loc[k_ab]
+        if pd.isna(a["lat"]):
+            return dash.no_update
+        lat, lon = float(a["lat"]), float(a["lon"])
+        return {"lat": lat, "lon": lon, "cap": cap_proche(data, lat, lon), "centrer": src == "table-aberrants",
+                "titre": f"⚠ Valeur aberrante retirée — {a['motif']}",
+                "detail": f"pic {fmt(a['pic_lx'], ' lx', 0)} (fond {fmt(a['fond_lx'], ' lx', 0)}) · largeur "
+                          f"{fmt(a['largeur_m'], ' m')} · {a['heure']} · position {a['precision']}"}
     clics = {"geo-troncons": clic_tr, "geo-hex": clic_hex, "geo-points": clic_pt, "geo-lampes": clic_lampe}
     clic = clics.get(src) if isinstance(src, str) else None
     if clic:
