@@ -1,7 +1,11 @@
 """Moyenne au tronçon sur le filaire de voirie (OpenStreetMap).
 
 1. Filaire : voies carrossables OSM de l'emprise des mesures (Overpass, mis en cache dans voirie/).
-2. Tronçons : chaque voie est coupée à chaque intersection (nœud partagé par plusieurs voies).
+2. Tronçons : un tronçon va d'un croisement au croisement suivant, et ne se coupe que là
+   (pas de recoupage par longueur). Croisement = nœud OSM où arrivent au moins 3 segments de voie
+   (carrefour, entrée de rond-point, raccord de bretelle). Deux ways OSM qui se suivent bout à bout
+   sans croisement (rue découpée pour un pont, etc.) sont fusionnées ; on coupe seulement si le nom,
+   le type de voie ou le sens unique y change. Rond-point : un tronçon entre deux entrées.
 3. Map-matching : chaque mesure (pas de 2 m) est rattachée au tronçon le plus proche (< 15 m)
    dont l'orientation est cohérente avec le cap du véhicule (évite les erreurs aux carrefours).
 4. Multi-passages : un passage = suite continue de mesures sur un même tronçon (coupure > 20 s).
@@ -46,8 +50,6 @@ ANGLE_MAX = 40.0      # écart max cap véhicule / orientation du tronçon (degr
 GAP_S = 20.0          # deux mesures d'un même tronçon séparées de plus de 20 s = 2 passages
 PAS_M = 2.0           # densification des tronçons
 COUV_MIN = 0.30
-LONG_MAX = 250.0      # au-delà, un tronçon (entre deux carrefours) est recoupé en parts de ~150 m
-LONG_CIBLE = 150.0
 
 _to93 = Transformer.from_crs(4326, 2154, always_xy=True)
 _to84 = Transformer.from_crs(2154, 4326, always_xy=True)
@@ -91,48 +93,92 @@ def charger_voirie(lat, lon) -> list[dict]:
 
 
 def decouper(ways: list[dict]) -> list[dict]:
-    """Coupe chaque voie à chaque intersection -> tronçons (coordonnées Lambert 93)."""
+    """Tronçons de croisement à croisement (coordonnées Lambert 93).
+
+    Le filaire est vu comme un graphe : nœud OSM = sommet, segment de voie = arête, degré d'un nœud =
+    nombre de segments qui y arrivent. Degré >= 3 : croisement (carrefour, entrée de rond-point,
+    raccord de bretelle) -> coupure. Degré 1 : impasse. Degré 2 : simple point de passage, y compris
+    quand deux ways OSM se suivent bout à bout (rue découpée pour un pont, un changement de
+    revêtement ou de limitation...) -> pas de coupure, les deux ways sont fusionnées. Exception : si le
+    nom, le type de voie ou le sens unique change à ce nœud, on coupe quand même (un tronçon porte une
+    seule classe SDAL et un seul nom).
+    """
     # nœud partagé = mêmes coordonnées dans plusieurs voies (OSM : un nœud = un point unique)
     cle = lambda g: (round(g["lat"], 7), round(g["lon"], 7))   # noqa: E731
-    usage = Counter(cle(g) for w in ways for g in w.get("geometry", []))
-    tr = []
+    voies, degre, coord = [], Counter(), {}
     for w in ways:
         geom = [g for g in w.get("geometry", []) if g]
-        nodes = [cle(g) for g in geom]
+        nodes = []
+        for g in geom:
+            n = cle(g)
+            coord.setdefault(n, (g["lon"], g["lat"]))
+            if not nodes or nodes[-1] != n:             # doublons consécutifs ignorés
+                nodes.append(n)
         if len(nodes) < 2:
             continue
+        for a, b in zip(nodes[:-1], nodes[1:]):
+            degre[a] += 1
+            degre[b] += 1
         tags = w.get("tags", {})
-        coupe = [0] + [i for i in range(1, len(nodes) - 1) if usage[nodes[i]] > 1] + [len(nodes) - 1]
+        hw = tags.get("highway", "road")
+        attrs = {"nom": tags.get("name") or tags.get("ref") or "", "highway": hw, "classe": classe(hw),
+                 "sens_unique": tags.get("oneway") in ("yes", "1", "-1") or tags.get("junction") == "roundabout"}
+        voies.append((w["id"], nodes, attrs))
+
+    # 1. morceaux de way entre deux croisements (coupure aux nœuds intérieurs de degré >= 3)
+    morceaux = []                                       # (id, nœuds, attributs)
+    for wid, nodes, attrs in voies:
+        coupe = [0] + [i for i in range(1, len(nodes) - 1) if degre[nodes[i]] >= 3] + [len(nodes) - 1]
         for a, b in zip(coupe[:-1], coupe[1:]):
-            lon = [g["lon"] for g in geom[a:b + 1]]
-            lat = [g["lat"] for g in geom[a:b + 1]]
-            x, y = _to93.transform(lon, lat)
-            lg = float(np.hypot(np.diff(x), np.diff(y)).sum())
-            if lg < 4:
-                continue
-            hw = tags.get("highway", "road")
-            base = {"nom": tags.get("name") or tags.get("ref") or "", "highway": hw, "classe": classe(hw),
-                    "sens_unique": tags.get("oneway") in ("yes", "1", "-1") or tags.get("junction") == "roundabout"}
-            x, y = np.asarray(x), np.asarray(y)
-            for j, (xx, yy) in enumerate(_recouper(x, y)):       # tronçons longs -> parts de ~150 m
-                ll, la = _to84.transform(xx, yy)
-                tr.append({**base, "id": f"{w['id']}_{a}_{j}", "lon": list(ll), "lat": list(la),
-                           "x": xx, "y": yy, "longueur_m": float(np.hypot(np.diff(xx), np.diff(yy)).sum())})
+            morceaux.append((f"{wid}_{a}", nodes[a:b + 1], attrs))
+
+    # 2. continuité : nœud de degré 2 où se touchent exactement deux extrémités de morceaux différents
+    #    de mêmes nom / type / sens unique -> les deux morceaux sont chaînés
+    bouts = {}
+    for k, (_, nodes, _) in enumerate(morceaux):
+        if nodes[0] != nodes[-1]:                       # un morceau fermé (boucle) n'a pas de bout libre
+            bouts.setdefault(nodes[0], []).append(k)
+            bouts.setdefault(nodes[-1], []).append(k)
+    attrs_fusion = lambda k: tuple(morceaux[k][2][c] for c in ("nom", "highway", "sens_unique"))  # noqa: E731
+    voisin = {}                                         # (morceau, nœud d'extrémité) -> morceau suivant
+    for n, ks in bouts.items():
+        if degre[n] == 2 and len(ks) == 2 and ks[0] != ks[1] and attrs_fusion(ks[0]) == attrs_fusion(ks[1]):
+            voisin[(ks[0], n)], voisin[(ks[1], n)] = ks[1], ks[0]
+
+    vus, chaines = set(), []
+
+    def suivre(k, nodes):                               # prolonge la chaîne depuis son dernier nœud
+        while (k, nodes[-1]) in voisin and voisin[(k, nodes[-1])] not in vus:
+            k = voisin[(k, nodes[-1])]
+            n2 = morceaux[k][1]
+            nodes = nodes + (n2 if n2[0] == nodes[-1] else n2[::-1])[1:]
+            vus.add(k)
+        return nodes
+
+    # départ sur un bout libre (croisement, impasse, changement de rue) ; ensuite les boucles restantes
+    milieu = {k for k in range(len(morceaux))
+              if (k, morceaux[k][1][0]) in voisin and (k, morceaux[k][1][-1]) in voisin}
+    for k in [k for k in range(len(morceaux)) if k not in milieu] + sorted(milieu):
+        if k in vus:
+            continue
+        vus.add(k)
+        nodes = morceaux[k][1]
+        if (k, nodes[0]) in voisin and (k, nodes[-1]) not in voisin:
+            nodes = nodes[::-1]                         # le bout chaîné passe en fin de liste
+        chaines.append((morceaux[k][0], suivre(k, nodes), morceaux[k][2]))
+
+    # 3. géométrie Lambert 93
+    tr = []
+    for tid, nodes, attrs in chaines:
+        lon = [coord[n][0] for n in nodes]
+        lat = [coord[n][1] for n in nodes]
+        x, y = _to93.transform(lon, lat)
+        x, y = np.asarray(x), np.asarray(y)
+        lg = float(np.hypot(np.diff(x), np.diff(y)).sum())
+        if lg < 4:                                      # miette de carrefour
+            continue
+        tr.append({**attrs, "id": tid, "lon": lon, "lat": lat, "x": x, "y": y, "longueur_m": lg})
     return tr
-
-
-def _recouper(x, y):
-    """Coupe une polyligne de plus de LONG_MAX en parts égales (~150 m)."""
-    d = np.r_[0, np.cumsum(np.hypot(np.diff(x), np.diff(y)))]
-    n = max(1, round(d[-1] / LONG_CIBLE)) if d[-1] > LONG_MAX else 1
-    if n == 1:
-        return [(x, y)]
-    parts = []
-    for k in range(n):
-        a, b = d[-1] * k / n, d[-1] * (k + 1) / n
-        dd = np.r_[a, d[(d > a) & (d < b)], b]
-        parts.append((np.interp(dd, d, x), np.interp(dd, d, y)))
-    return parts
 
 
 def _densifier(tr):
