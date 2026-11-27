@@ -245,6 +245,18 @@ def _interp_masque(v, bad):
     return out
 
 
+def nom_capteurs(indices, meta):
+    """« Lux3 (gauche) + Lux2 (centre) » : nom du luxmètre et côté (position y > 0 = à gauche du sens de marche)."""
+    if len(indices) == len(meta):
+        return "les 3"
+    noms = []
+    for c in indices:
+        y = meta[c]["position"][1] if c < len(meta) else 0
+        cote = "gauche" if y > 0.1 else "droite" if y < -0.1 else "centre"
+        noms.append(f"{meta[c]['nom'] if c < len(meta) else f'L{c + 1}'} ({cote})")
+    return " + ".join(noms) or "–"
+
+
 def clean_lux(L, fs, V=None, P: "Params | None" = None):
     """Nettoyage du signal en 5 étapes (détail dans EXPLICATION_DU_CODE.md) :
     1. négatifs (offset capteur) ramenés à 0 ;
@@ -303,7 +315,9 @@ def clean_lux(L, fs, V=None, P: "Params | None" = None):
             bad[max(0, a_):min(n, b_)] = True
             lab = ("trop haut" if trop_haut[k] else
                    "variation à l'arrêt" if v[pk[k]] < P.vitesse_min else "trop bref")
-            events.append((int(pk[k]), float(E[pk[k]]), float(dur[k]), float(larg[k]), float(base_pk[k]), lab))
+            # capteurs qui portent le pic : leur valeur brute dépasse la ligne de base d'au moins la moitié du pic
+            cap = [c for c in range(L.shape[0]) if L[c, pk[k]] - base_pk[k] >= 0.5 * prom[k]]
+            events.append((int(pk[k]), float(E[pk[k]]), float(dur[k]), float(larg[k]), float(base_pk[k]), lab, cap))
         n_haut, n_bref = int(trop_haut.sum()), int(trop_bref.sum())
         n_arret = sum(1 for e in events if e[5] == "variation à l'arrêt")
         n_bref -= n_arret
@@ -512,8 +526,10 @@ def analyser(tdms_path: Path, out_dir: Path, P: Params | None = None, log=print)
         part_pics=_r(100 * bruit["part_pics"], 2), part_incoherents=_r(100 * bruit["part_incoherents"], 2),
         n_trop_haut=bruit["n_trop_haut"], n_trop_bref=bruit["n_trop_bref"], n_var_arret=bruit["n_arret"],
         part_aberrants=_r(100 * bruit["part_aberrants"], 3), n_excursions=bruit["n_excursions"],
-        aberrants=[[hloc_(t_gps[i0]), _r(pk_, 0), _r(du_, 2), _r(la_, 1), _r(ba_, 0), ty_]
-                   for i0, pk_, du_, la_, ba_, ty_ in sorted(ev_aberrants, key=lambda e: -e[1])[:25]],
+        # 9 champs : lat / lon (7e, 8e) laissés vides, retrouvés par le dashboard ; 9e = capteurs qui portent le pic
+        aberrants=[[hloc_(t_gps[i0]), _r(pk_, 0), _r(du_, 2), _r(la_, 1), _r(ba_, 0), ty_, None, None,
+                    nom_capteurs(cap_, lux_meta)]
+                   for i0, pk_, du_, la_, ba_, ty_, cap_ in sorted(ev_aberrants, key=lambda e: -e[1])[:25]],
         part_arret=_r(100 * part_arret, 1),
         corr_capteurs=[_r(corr[0, 1], 2), _r(corr[0, 2], 2), _r(corr[1, 2], 2)],
         corr_chromametre=_r(corr_cal, 2), capteurs=lux_meta, fs=_r(fs, 1),

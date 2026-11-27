@@ -404,8 +404,10 @@ def aberrants_gps(resume, m):
                 i = int(np.argmin(dt))
                 precision = "approchée (véhicule à l'arrêt)"
             lat, lon = float(m["lat"].iat[i]), float(m["lon"].iat[i])
-        lignes.append(dict(id=k, heure=heure, motif=motif, pic_lx=pic, fond_lx=fond, largeur_m=largeur, duree_s=duree,
-                           lat=lat, lon=lon, precision=precision))
+        # 9e champ : capteurs qui portent le pic (absent des rapports produits avant son ajout)
+        capteur = a[8] if len(a) >= 9 and a[8] else "–"
+        lignes.append(dict(id=k, heure=heure, motif=motif, capteur=capteur, pic_lx=pic, fond_lx=fond,
+                           largeur_m=largeur, duree_s=duree, lat=lat, lon=lon, precision=precision))
     df = pd.DataFrame(lignes)
     return df if df["lat"].notna().any() else None
 
@@ -618,7 +620,7 @@ def bruit(data):
     chacun avec ses coordonnées GPS. Clic sur une ligne -> Street View à droite et carte centrée sur le point."""
     q, k = data["resume"].get("qualite", {}), data["resume"].get("kpi", {})
     ab = data["aberrants"]
-    cols = [("heure", "Heure"), ("motif", "Motif"), ("pic_lx", "Pic (lx)"), ("fond_lx", "Fond (lx)"),
+    cols = [("heure", "Heure"), ("motif", "Motif"), ("capteur", "Capteur"), ("pic_lx", "Pic (lx)"), ("fond_lx", "Fond (lx)"),
             ("largeur_m", "Largeur (m)"), ("gps", "Coordonnées GPS"), ("precision", "Position")]
     # table toujours présente (vide et masquée s'il n'y a rien) : elle est une entrée de choisir_point
     table_vide = html.Div(dash_table.DataTable(id="table-aberrants", data=[],
@@ -630,17 +632,10 @@ def bruit(data):
     pastille = lambda c: html.Span(className="pastille rond", style={"background": c})  # noqa: E731
     intro = html.Div([
         html.P([html.B(f"{fmt(k.get('n_aberrants'), dec=0)} valeurs aberrantes retirées"),
-                f" ({fmt(q.get('part_aberrants'), ' %', 2)} des mesures), remplacées par interpolation. "
-                f"Autres corrections : {fmt(q.get('part_negatifs'), ' %', 1)} de mesures négatives ramenées à 0, "
-                f"{fmt(q.get('part_pics'), ' %', 2)} de parasites sur un seul capteur (filtre de Hampel), "
-                f"{fmt(k.get('n_pas_incoh'), dec=0)} passages incohérents écartés (phares, vitrine)."],
+                f" ({fmt(q.get('part_aberrants'), ' %', 2)} des mesures)"],
                className="small mb-2"),
         html.Div([html.Span([pastille(COUL_MOTIFS.get(m_, ROUGE)), f"{n} {m_}"], className="me-3 small")
                   for m_, n in par_motif.items()], className="mb-2"),
-        html.P([html.I(className="bi bi-cursor me-1"),
-                "Cliquez une ligne : Street View s'ouvre à droite sur le lieu du pic et la carte s'y centre. "
-                "Activez « Valeurs aberrantes » au-dessus de la carte (vue Tronçons) pour les voir toutes."],
-               className="small text-muted mb-2"),
     ])
     if ab is None:
         return html.Div([intro, table_vide])
@@ -784,6 +779,12 @@ def segmente(id_, valeur, options, titre=None):
     return html.Div([html.Span(titre, className="outil-titre"), radio], className="outil", id=f"outil-{id_}")
 
 
+# fond de carte : même choix (et même valeur, synchronisée) dans la vue Analyste et la vue Opérateur
+OPTIONS_FOND = [
+    {"label": [html.I(className="bi bi-moon-stars me-1"), "Sombre"], "value": "sombre"},
+    {"label": [html.I(className="bi bi-sun me-1"), "Clair"], "value": "clair"},
+    {"label": [html.I(className="bi bi-globe-europe-africa me-1"), "Satellite"], "value": "satellite"}]
+
 upload_style = {"border": "1.5px dashed #3d444d", "borderRadius": "10px", "padding": "22px",
                 "textAlign": "center", "cursor": "pointer"}
 
@@ -807,17 +808,13 @@ def legende_operateur():
 def page_operateur():
     """Vue Opérateur : le .tdms brut sur la carte (sans analyse), contrôles, points annotés et notes."""
     return dbc.Container(fluid=True, className="contenu", children=[
-        html.Div(className="contexte", children=[
-            html.I(className="bi bi-info-circle me-1"),
-            "Contrôle de la tournée : données brutes du .tdms uniquement. Les 3 luxmètres côte à côte, "
-            "une valeur par position GPS (5 par seconde), sans moyenne, lissage ni filtre. Vérifiez que tout le "
-            "secteur est couvert et qu'aucun capteur n'a décroché."]),
         dbc.Row(className="g-3", children=[
             dbc.Col(xl=8, children=dbc.Card(className="bloc", children=[
                 dbc.CardHeader(html.Div(className="barre-outils", children=[
                     html.Div(className="outil", children=[
                         html.Span("Fichier .tdms de la tournée", className="outil-titre"),
                         html.Span(id="op-nom", className="fw-semibold")]),
+                    segmente("op-fond", "clair", OPTIONS_FOND, "Fond"),
                     dbc.Checklist(id="op-mode-note", value=[], switch=True, className="small outil-couches",
                                   options=[{"label": "Ajouter un point au clic", "value": "on"}]),
                 ])),
@@ -841,9 +838,7 @@ def page_operateur():
                                      "travaux, rue non parcourue…)", className="mb-2"),
                         dbc.Button([html.I(className="bi bi-plus-lg me-1"), "Ajouter le point"], id="op-ajouter",
                                    size="sm", color="success")]),
-                    html.Div(id="op-liste"),
-                    html.Div("Activez « Ajouter un point au clic » puis cliquez sur la carte.",
-                             className="small text-muted"),
+                    html.Div(id="op-liste"), html.Div(id="op-aller-fait", hidden=True),
                 ]),
                 carte_bloc("Notes de la tournée", "journal-text", [
                     dbc.Textarea(id="op-notes", rows=5, placeholder="Conditions, incidents, secteurs à repasser…"),
@@ -984,11 +979,7 @@ app.layout = html.Div(className="page", children=[
                         {"label": [html.I(className="bi bi-soundwave me-1"), "Avant"], "value": "avant"},
                         {"label": [html.I(className="bi bi-activity me-1"), "Après lissage"], "value": "apres"}],
                         "Bruit (tronçons, hexagones)"),
-                    segmente("fond", "clair", [
-                        {"label": [html.I(className="bi bi-moon-stars me-1"), "Sombre"], "value": "sombre"},
-                        {"label": [html.I(className="bi bi-sun me-1"), "Clair"], "value": "clair"},
-                        {"label": [html.I(className="bi bi-globe-europe-africa me-1"), "Satellite"],
-                         "value": "satellite"}], "Fond"),
+                    segmente("fond", "clair", OPTIONS_FOND, "Fond"),
                     html.Div(id="outil-export", className="outil", style={"display": "none"}, children=[
                         html.Span("Export", className="outil-titre"),
                         dbc.DropdownMenu(label=[html.I(className="bi bi-download me-1"), "Exporter en GeoJSON"],
@@ -1391,12 +1382,18 @@ app.clientside_callback(
     Input("theme", "data"))
 
 
-@app.callback(Output("fond", "value"), Input("theme", "data"), State("fond", "value"))
-def fond_selon_theme(theme, fond):
-    """Le fond de carte suit le thème (sauf satellite, choisi exprès)."""
-    if fond == "satellite":
-        return dash.no_update
-    return "sombre" if theme == "sombre" else "clair"
+@app.callback(Output("fond", "value"), Output("op-fond", "value"),
+              Input("theme", "data"), Input("fond", "value"), Input("op-fond", "value"))
+def synchro_fond(theme, fond, fond_op):
+    """Un seul fond pour les deux vues : le choix fait dans l'une vaut pour l'autre. Il suit le thème (sauf
+    satellite, choisi exprès)."""
+    if ctx.triggered_id == "op-fond":
+        v = fond_op
+    elif ctx.triggered_id == "fond":
+        v = fond
+    else:
+        v = fond if fond == "satellite" else ("sombre" if theme == "sombre" else "clair")
+    return v, v
 
 
 app.clientside_callback(
@@ -1569,7 +1566,7 @@ def marquer_selection(sel):
     if not sel.get("centrer"):
         return calques, dash.no_update
     return calques, {"center": [sel.get("c_lat", sel["lat"]), sel.get("c_lon", sel["lon"])],
-                     "zoom": sel.get("zoom", 17.5), "transition": "flyTo"}
+                     "zoom": sel.get("zoom", 17.5), "transition": "setView"}   # direct : flyTo dézoome puis rezoome
 
 
 # sélection depuis une liste : on fait défiler la page jusqu'à la carte
@@ -1711,12 +1708,14 @@ def placer_point(clic, mode):
 
 
 def _marqueurs(notes, attente=None):
-    calques = [dl.CircleMarker(center=[p["lat"], p["lon"]], radius=9, color="#111", weight=1.5, fillColor="#F2A900",
-                               fillOpacity=0.95, children=dl.Tooltip(f"{i}. {p.get('texte', '')}"))
+    # volet des marqueurs (z 600) : au-dessus du canevas des lux bruts (volet traceBrute, z 450)
+    calques = [dl.CircleMarker(id={"type": "op-point", "k": i - 1}, center=[p["lat"], p["lon"]], radius=9,
+                               color="#fff", weight=2, fillColor="#D63AF9", fillOpacity=0.95, pane="markerPane",
+                               bubblingMouseEvents=False, children=dl.Tooltip(f"{i}. {p.get('texte', '')}"))
                for i, p in enumerate(notes.get("points", []), 1)]
     if attente:
         calques.append(dl.CircleMarker(center=attente, radius=9, color="#111", weight=1.5, dashArray="3",
-                                       fillColor="#ffffff", fillOpacity=0.8))
+                                       fillColor="#ffffff", fillOpacity=0.8, pane="markerPane"))
     return calques
 
 
@@ -1728,10 +1727,33 @@ def _liste(notes):
             html.Span(f"{i}", className="deficit-rang"),
             html.Div([html.Div(p.get("texte") or "(sans commentaire)"),
                       html.Div(f"{p['lat']:.5f}, {p['lon']:.5f} · {p.get('date', '')}", className="small text-muted")],
-                     className="flex-grow-1"),
+                     id={"type": "op-aller", "k": i - 1}, className="flex-grow-1 point-aller",
+                     title="Voir ce point sur la carte"),
             html.Button(html.I(className="bi bi-trash"), id={"type": "op-suppr", "k": i - 1},
                         className="btn btn-sm btn-link text-danger p-0", title="Supprimer")])
         for i, p in enumerate(notes["points"], 1)])
+
+
+# clic sur un point annoté (liste ou carte) : la carte se centre dessus et ouvre son commentaire
+app.clientside_callback(
+    """function(liste, carte, marqueurs) {
+        const t = dash_clientside.callback_context.triggered;
+        if (!t.length || !t[0].value) return dash_clientside.no_update;
+        const k = JSON.parse(t[0].prop_id.split('.')[0]).k, m = window.getysCarteOperateur;
+        const p = (marqueurs || [])[k];
+        if (!m || !p) return dash_clientside.no_update;
+        const centre = p.props.center, r = m.getContainer().getBoundingClientRect();
+        if (r.top < 0 || r.bottom > window.innerHeight)              // liste sous la carte (écran étroit)
+            m.getContainer().scrollIntoView({behavior: 'smooth', block: 'center'});
+        // directement sur le point (flyTo dézoome puis rezoome en survolant la carte : déroutant)
+        m.setView(centre, Math.max(m.getZoom(), 19), {animate: false});
+        m.eachLayer(l => {
+            if (l.getTooltip && l.getTooltip() && l.getLatLng && l.getLatLng().equals(L.latLng(centre))) l.openTooltip();
+        });
+        return '';
+    }""",
+    Output("op-aller-fait", "children"), Input({"type": "op-aller", "k": ALL}, "n_clicks"),
+    Input({"type": "op-point", "k": ALL}, "n_clicks"), State("op-marqueurs", "children"), prevent_initial_call=True)
 
 
 @app.callback(Output("op-marqueurs", "children"), Output("op-liste", "children"), Output("op-texte", "value"),

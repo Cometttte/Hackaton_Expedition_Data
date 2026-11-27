@@ -76,8 +76,8 @@ def carte_svg(tr: pd.DataFrame, geoms: dict, points=(), l=900, hmax=560) -> str:
                       f'<title>{e(r.nom)} — {fmt(r.E_moy, " lx")} (seuil {fmt(r.seuil, " lx")})</title></polyline>')
     for i, p in enumerate(points, 1):
         a, b = xy(p["lon"], p["lat"])
-        traits.append(f'<circle cx="{a:.1f}" cy="{b:.1f}" r="7" fill="#F2A900" stroke="#111" stroke-width="1.2"/>'
-                      f'<text x="{a:.1f}" y="{b + 3.5:.1f}" font-size="9" text-anchor="middle" font-weight="700">{i}</text>')
+        traits.append(f'<circle cx="{a:.1f}" cy="{b:.1f}" r="7" fill="#D63AF9" stroke="#fff" stroke-width="1.5"/>'
+                      f'<text x="{a:.1f}" y="{b + 3.5:.1f}" font-size="9" text-anchor="middle" font-weight="700" fill="#fff">{i}</text>')
     return f'<svg viewBox="0 0 {l} {haut:.0f}" width="100%" role="img" aria-label="Carte de conformité">{"".join(traits)}</svg>'
 
 
@@ -226,9 +226,9 @@ PAGE = """<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>{tit
  .n{{text-align:right;font-variant-numeric:tabular-nums}} tr{{break-inside:avoid}}
  .note{{color:#66756B;font-size:.85rem}} .leg{{font-size:.8rem;color:#66756B}}
  .leg i{{display:inline-block;width:18px;height:4px;border-radius:2px;margin:0 6px 2px 12px;vertical-align:middle}}
- .leg i.rond{{width:10px;height:10px;border-radius:50%;background:#F2A900;border:1px solid #111}}
+ .leg i.rond{{width:10px;height:10px;border-radius:50%;background:#D63AF9;border:1px solid #fff}}
  .citation{{background:#F6FAF7;border-left:3px solid #8DBF2E;padding:10px 14px;border-radius:4px}}
- svg{{border:1px solid #DCE7DF;border-radius:6px;background:#FAFCFA}}
+ svg[role=img]{{border:1px solid #DCE7DF;border-radius:6px;background:#FAFCFA}}  /* la carte seule : pas les calques Plotly */
  @media print{{body{{padding:0}} .tuiles{{grid-template-columns:repeat(3,1fr)}} h2{{page-break-after:avoid}}}}
 </style></head><body>
 <header><h1>{titre}</h1><div class="sous">{sous_titre}</div>

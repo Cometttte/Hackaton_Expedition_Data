@@ -313,6 +313,8 @@ a { color: var(--vert-texte); }
 
 /* tableaux et graphiques Plotly (couleurs posées en ligne par Plotly : surchargées ici) */
 [data-theme="sombre"] .dash-spreadsheet-inner td { color: var(--texte); }
+/* pas de surlignage blanc (défaut Dash) au survol d'une ligne */
+[data-theme="sombre"] .dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner tr:hover { background-color: transparent !important; }
 [data-theme="sombre"] .js-plotly-plot .main-svg text { fill: var(--texte-2) !important; }
 [data-theme="sombre"] .js-plotly-plot .main-svg .gtitle, [data-theme="sombre"] .js-plotly-plot .main-svg .legendtext { fill: var(--texte) !important; }
 [data-theme="sombre"] .js-plotly-plot :is(.gridlayer path, .zerolinelayer path) { stroke: var(--bord) !important; }
@@ -353,7 +355,9 @@ a { color: var(--vert-texte); }
 .liste-points { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; margin-bottom: 6px; }
 .point-note { display: flex; gap: 10px; align-items: flex-start; font-size: 0.86rem; padding: 6px 8px;
   border: 1px solid var(--bord); border-radius: 6px; background: var(--surface); }
-.point-note .deficit-rang { background: #F2A900; color: #111; flex-shrink: 0; }
+.point-note .deficit-rang { background: #D63AF9; color: #fff; flex-shrink: 0; }   /* magenta : hors palette des lux */
+.point-aller { cursor: pointer; }
+.point-note:has(.point-aller:hover) { border-color: var(--vert); }
 .sdal-upload { border: 1.5px dashed var(--bord); border-radius: 6px; padding: 7px 10px; text-align: center;
   cursor: pointer; font-size: 0.85rem; color: var(--vert-texte); }
 .sdal-upload:hover { border-color: var(--vert); }
